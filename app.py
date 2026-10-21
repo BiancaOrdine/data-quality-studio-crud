@@ -4,7 +4,13 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 
-from db import testar_conexao
+from db import (
+    testar_conexao,
+    listar_registros,
+    inserir_registro,
+    atualizar_registro,
+    excluir_registro,
+)
 
 
 PASTA_PROJETO = Path(__file__).parent
