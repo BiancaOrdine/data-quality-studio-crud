@@ -10,6 +10,7 @@ from db import (
     inserir_registro,
     atualizar_registro,
     excluir_registro,
+    importar_csv_para_supabase,
 )
 
 
@@ -789,6 +790,43 @@ st.markdown(
 st.divider()
 st.header("Gerenciamento de dados")
 st.write("Consulte e gerencie os registros armazenados no Supabase.")
+
+
+from pathlib import Path
+
+PASTA_DADOS = Path(__file__).parent / "dados_processados"
+
+st.warning(
+    "Importe os CSVs apenas se as tabelas estiverem vazias "
+    "ou se quiser adicionar registros que ainda não existem."
+)
+
+if st.button("Importar CSVs para o Supabase"):
+    try:
+        compras_csv = PASTA_DADOS / "compras_limpo.csv"
+        pedidos_csv = PASTA_DADOS / "pedidos_limpo.csv"
+
+        if not compras_csv.exists() or not pedidos_csv.exists():
+            st.error("Não encontrei os dois arquivos CSV.")
+        else:
+            quantidade_compras = importar_csv_para_supabase(
+                str(compras_csv), "compras"
+            )
+
+            quantidade_pedidos = importar_csv_para_supabase(
+                str(pedidos_csv), "pedidos"
+            )
+
+            st.success(
+                f"Importação concluída! "
+                f"Compras inseridas: {quantidade_compras}. "
+                f"Pedidos inseridos: {quantidade_pedidos}."
+            )
+
+            st.rerun()
+
+    except Exception as erro:
+        st.error(f"Erro na importação: {erro}")
 
 aba_compras, aba_pedidos = st.tabs(["Compras", "Pedidos"])
 
