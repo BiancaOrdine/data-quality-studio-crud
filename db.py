@@ -158,7 +158,7 @@ def importar_csv_para_supabase(caminho_csv, tabela):
             "cliente_id": "cliente_id",
             "data_compra": "data_compra",
             "valor_total": "valor_total",
-            "método_pagamento": "metodo_pagamento",
+            "metodo_pagamento": "metodo_pagamento",
         },
         "pedidos": {
             "id_pedido": "id_pedido",
