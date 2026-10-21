@@ -784,3 +784,30 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+# GERENCIAMENTO DE DADOS - CRUD
+st.divider()
+st.header("Gerenciamento de dados")
+st.write("Consulte e gerencie os registros armazenados no Supabase.")
+
+aba_compras, aba_pedidos = st.tabs(["Compras", "Pedidos"])
+
+with aba_compras:
+    st.subheader("Registros de compras")
+
+    try:
+        dados_compras = listar_registros("compras")
+        st.dataframe(dados_compras, use_container_width=True)
+        st.caption(f"Total de registros: {len(dados_compras)}")
+    except Exception as erro:
+        st.error(f"Não foi possível consultar compras: {erro}")
+
+with aba_pedidos:
+    st.subheader("Registros de pedidos")
+
+    try:
+        dados_pedidos = listar_registros("pedidos")
+        st.dataframe(dados_pedidos, use_container_width=True)
+        st.caption(f"Total de registros: {len(dados_pedidos)}")
+    except Exception as erro:
+        st.error(f"Não foi possível consultar pedidos: {erro}")
