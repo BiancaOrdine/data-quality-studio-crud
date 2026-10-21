@@ -151,7 +151,6 @@ def excluir_registro(tabela, id_valor):
 import pandas as pd
 from pathlib import Path
 
-
 def importar_csv_para_supabase(caminho_csv, tabela):
     mapeamentos = {
         "compras": {
@@ -174,6 +173,69 @@ def importar_csv_para_supabase(caminho_csv, tabela):
         raise ValueError("Tabela não permitida.")
 
     df = pd.read_csv(caminho_csv)
+    df.columns = df.columns.str.strip()
+
+    mapa = mapeamentos[tabela]
+
+    if set(df.columns) != set(mapa.keys()):
+        raise ValueError(
+            f"Colunas inesperadas em {caminho_csv}. "
+            f"Encontradas: {list(df.columns)}"
+        )
+
+    df = df.rename(columns=mapa)
+
+    id_coluna = TABELAS_PERMITIDAS[tabela]["id"]
+
+    # Evita IDs repetidos dentro do próprio CSV
+    df = df.drop_duplicates(subset=[id_coluna], keep="first")
+
+    df = df.astype(object).where(pd.notna(df), None)
+    registros = df.to_dict(orient="records")
+    colunas = list(mapa.values())
+
+    if not registros:
+        return 0
+
+    inseridos = 0
+
+    with conectar_banco() as conn:
+        with conn.cursor() as cursor:
+
+            # Consulta os IDs que já existem no Supabase
+            cursor.execute(
+                sql.SQL("SELECT {} FROM {}").format(
+                    sql.Identifier(id_coluna),
+                    sql.Identifier(tabela),
+                )
+            )
+
+            ids_existentes = {linha[0] for linha in cursor.fetchall()}
+
+            for registro in registros:
+                id_registro = registro[id_coluna]
+
+                # Não insere um registro cujo ID já existe
+                if id_registro in ids_existentes:
+                    continue
+
+                cursor.execute(
+                    sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+                        sql.Identifier(tabela),
+                        sql.SQL(", ").join(
+                            sql.Identifier(c) for c in colunas
+                        ),
+                        sql.SQL(", ").join(
+                            sql.Placeholder() for _ in colunas
+                        ),
+                    ),
+                    tuple(registro[c] for c in colunas),
+                )
+
+                ids_existentes.add(id_registro)
+                inseridos += 1
+
+    return inseridos
 
     # Remove espaços extras dos nomes das colunas
     df.columns = df.columns.str.strip()
