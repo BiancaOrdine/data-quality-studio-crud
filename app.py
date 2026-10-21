@@ -4,6 +4,8 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 
+from db import testar_conexao
+
 
 PASTA_PROJETO = Path(__file__).parent
 PASTA_DADOS = PASTA_PROJETO / "dados_processados"
@@ -25,7 +27,15 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-
+try:
+    if testar_conexao():
+        st.success("Conexão com o Supabase estabelecida!")
+    else:
+        st.error("Não foi possível confirmar a conexão.")
+except Exception as erro:
+    st.error("Falha ao conectar ao banco de dados.")
+    st.caption(f"Detalhes técnicos: {type(erro).__name__}")
+    
 # Estilos
 
 st.markdown(
