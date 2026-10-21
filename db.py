@@ -147,3 +147,148 @@ def excluir_registro(tabela, id_valor):
             )
 
             return cursor.rowcount
+
+import pandas as pd
+from pathlib import Path
+
+
+def importar_csv_para_supabase(caminho_csv, tabela):
+    mapeamentos = {
+        "compras": {
+            "id_compra": "id_compra",
+            "cliente_id": "cliente_id",
+            "data_compra": "data_compra",
+            "valor_total": "valor_total",
+            "método_pagamento": "metodo_pagamento",
+        },
+        "pedidos": {
+            "id_pedido": "id_pedido",
+            "id_compra": "id_compra",
+            "id_do_produto": "produto_id",
+            "quantidade": "quantidade",
+            "preco_unitário": "preco_unitario",
+        },
+    }
+
+    if tabela not in mapeamentos:
+        raise ValueError("Tabela não permitida.")
+
+    df = pd.read_csv(caminho_csv)
+
+    # Remove espaços extras dos nomes das colunas
+    df.columns = df.columns.str.strip()
+
+    mapa = mapeamentos[tabela]
+
+    # Confere se o CSV possui todas as colunas esperadas
+    colunas_esperadas = list(mapa.keys())
+
+    if set(df.columns) != set(colunas_esperadas):
+        raise ValueError(
+            f"Colunas inesperadas no arquivo {caminho_csv}. "
+            f"Esperadas: {colunas_esperadas}. "
+            f"Encontradas: {list(df.columns)}"
+        )
+
+    # Renomeia as colunas para corresponder ao Supabase
+    df = df.rename(columns=mapa)
+
+    # Converte valores vazios em NULL
+    df = df.astype(object).where(pd.notna(df), None)
+
+    colunas = list(mapa.values())
+    registros = df.to_dict(orient="records")
+
+    if not registros:
+        return 0
+
+    with conectar_banco() as conn:
+        with conn.cursor() as cursor:
+            for registro in registros:
+                cursor.execute(
+                    sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+                        sql.Identifier(tabela),
+                        sql.SQL(", ").join(
+                            sql.Identifier(c) for c in colunas
+                        ),
+                        sql.SQL(", ").join(
+                            sql.Placeholder() for _ in colunas
+                        ),
+                    ),
+                    tuple(registro[c] for c in colunas),
+                )
+
+    return len(registros)
+
+
+import pandas as pd
+from pathlib import Path
+
+
+def importar_csv_para_supabase(caminho_csv, tabela):
+    mapeamentos = {
+        "compras": {
+            "id_compra": "id_compra",
+            "cliente_id": "cliente_id",
+            "data_compra": "data_compra",
+            "valor_total": "valor_total",
+            "método_pagamento": "metodo_pagamento",
+        },
+        "pedidos": {
+            "id_pedido": "id_pedido",
+            "id_compra": "id_compra",
+            "id_do_produto": "produto_id",
+            "quantidade": "quantidade",
+            "preco_unitário": "preco_unitario",
+        },
+    }
+
+    if tabela not in mapeamentos:
+        raise ValueError("Tabela não permitida.")
+
+    df = pd.read_csv(caminho_csv)
+
+    # Remove espaços extras dos nomes das colunas
+    df.columns = df.columns.str.strip()
+
+    mapa = mapeamentos[tabela]
+
+    # Confere se o CSV possui todas as colunas esperadas
+    colunas_esperadas = list(mapa.keys())
+
+    if set(df.columns) != set(colunas_esperadas):
+        raise ValueError(
+            f"Colunas inesperadas no arquivo {caminho_csv}. "
+            f"Esperadas: {colunas_esperadas}. "
+            f"Encontradas: {list(df.columns)}"
+        )
+
+    # Renomeia as colunas para corresponder ao Supabase
+    df = df.rename(columns=mapa)
+
+    # Converte valores vazios em NULL
+    df = df.astype(object).where(pd.notna(df), None)
+
+    colunas = list(mapa.values())
+    registros = df.to_dict(orient="records")
+
+    if not registros:
+        return 0
+
+    with conectar_banco() as conn:
+        with conn.cursor() as cursor:
+            for registro in registros:
+                cursor.execute(
+                    sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+                        sql.Identifier(tabela),
+                        sql.SQL(", ").join(
+                            sql.Identifier(c) for c in colunas
+                        ),
+                        sql.SQL(", ").join(
+                            sql.Placeholder() for _ in colunas
+                        ),
+                    ),
+                    tuple(registro[c] for c in colunas),
+                )
+
+    return len(registros)
