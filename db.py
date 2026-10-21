@@ -210,10 +210,13 @@ def importar_csv_para_supabase(caminho_csv, tabela):
                 )
             )
 
-            ids_existentes = {linha[0] for linha in cursor.fetchall()}
+            ids_existentes = {
+                str(linha[0]).strip()
+                for linha in cursor.fetchall()
+            }
 
             for registro in registros:
-                id_registro = registro[id_coluna]
+                id_registro = str(registro[id_coluna]).strip()
 
                 # Não insere um registro cujo ID já existe
                 if id_registro in ids_existentes:
