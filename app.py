@@ -828,7 +828,7 @@ with st.expander("Importar dados de um arquivo CSV"):
         "Se o ID principal não estiver preenchido, ele será gerado automaticamente."
     )
 
-    with st.form("form_importar_csv", clear_on_submit=True):
+    with st.form("form_importar_csv"):
         tabela_csv = st.selectbox(
             "Tabela de destino",
             options=["compras", "pedidos", "produtos"],
@@ -881,30 +881,30 @@ with aba_compras:
             st.caption("O ID é gerado pelo sistema e não pode ser editado.")
             cliente_opcoes = ["Novo cliente (gerar ID)"] + clientes_existentes
 
-            with st.form("form_cadastrar_compra", clear_on_submit=True):
+            with st.form("form_cadastrar_compra_v2"):
                 cliente_escolhido = st.selectbox(
                     "Cliente",
                     options=cliente_opcoes,
                     format_func=lambda x: x if isinstance(x, str) else f"Cliente {x}",
-                    key="novo_cliente_escolhido",
+                    key="novo_cliente_escolhido_v2",
                 )
                 data_compra_nova = st.date_input(
                     "Data da compra",
-                    key="nova_data_compra",
+                    key="nova_data_compra_v2",
                 )
                 valor_total_novo = st.number_input(
                     "Valor total (R$)",
                     min_value=0.01,
                     max_value=9_999_999_999.99,
                     value=10.0,
-                    step=10.0,
+                    step=1.0,
                     format="%.2f",
-                    key="novo_valor_total",
+                    key="novo_valor_total_v2",
                 )
                 metodo_novo = st.selectbox(
                     "Método de pagamento",
                     options=METODOS_PAGAMENTO,
-                    key="novo_metodo_pagamento",
+                    key="novo_metodo_pagamento_v2",
                 )
                 cadastrar_compra = st.form_submit_button("Cadastrar compra")
 
@@ -962,18 +962,18 @@ with aba_compras:
                 if metodo_atual not in METODOS_PAGAMENTO:
                     metodo_atual = "Cartão de Crédito"
 
-                with st.form(f"form_editar_compra_{id_editar}", clear_on_submit=True):
+                with st.form(f"form_editar_compra_v2_{id_editar}"):
                     st.text_input("ID da compra (fixo)", value=str(id_editar), disabled=True, key=f"id_compra_fixo_{id_editar}")
                     cliente_editado = st.number_input(
                         "ID do cliente",
                         min_value=1,
                         value=max(1, int(registro.get("cliente_id") or 1)),
-                        key=f"cliente_editado_{id_editar}",
+                        key=f"cliente_editado_v2_{id_editar}",
                     )
                     data_editada = st.date_input(
                         "Data da compra",
                         value=data_atual,
-                        key=f"data_editada_{id_editar}",
+                        key=f"data_editada_v2_{id_editar}",
                     )
                     valor_original = registro.get("valor_total")
                     valor_editado = st.number_input(
@@ -981,15 +981,15 @@ with aba_compras:
                         min_value=0.01,
                         max_value=9_999_999_999.99,
                         value=min(9_999_999_999.99, max(0.01, float(valor_original or 0.01))),
-                        step=10.0,
+                        step=1.0,
                         format="%.2f",
-                        key=f"valor_editado_{id_editar}",
+                        key=f"valor_editado_v2_{id_editar}",
                     )
                     metodo_editado = st.selectbox(
                         "Método de pagamento",
                         options=METODOS_PAGAMENTO,
                         index=METODOS_PAGAMENTO.index(metodo_atual),
-                        key=f"metodo_editado_{id_editar}",
+                        key=f"metodo_editado_v2_{id_editar}",
                     )
                     salvar_edicao_compra = st.form_submit_button("Salvar alterações")
 
@@ -1081,12 +1081,12 @@ with aba_pedidos:
             st.text_input("ID do pedido (automático)", value=str(proximo_id("pedidos")), disabled=True, key=f"id_pedido_novo_visual_{proximo_id('pedidos')}")
             st.caption("O ID é gerado pelo sistema e não pode ser editado.")
             if ids_compras_disponiveis:
-                with st.form("form_cadastrar_pedido", clear_on_submit=True):
+                with st.form("form_cadastrar_pedido_v2"):
                     compra_do_pedido = st.selectbox(
                         "Compra vinculada",
                         options=ids_compras_disponiveis,
                         format_func=lambda x: f"Compra {x}",
-                        key="nova_compra_pedido",
+                        key="nova_compra_pedido_v2",
                     )
                     produtos_disponiveis = listar_registros("produtos")
                     ids_produtos = [str(r["produto_id"]) for r in produtos_disponiveis]
@@ -1094,7 +1094,7 @@ with aba_pedidos:
                         produto_novo = st.selectbox(
                             "Produto", options=ids_produtos,
                             format_func=lambda x: next((f"{r['nome_produto']} ({r['produto_id']})" for r in produtos_disponiveis if str(r['produto_id']) == str(x)), str(x)),
-                            key="novo_produto_id",
+                            key="novo_produto_id_v2",
                         )
                     else:
                         produto_novo = ""
@@ -1104,7 +1104,7 @@ with aba_pedidos:
                         min_value=1,
                         value=1,
                         step=1,
-                        key="nova_quantidade_pedido",
+                        key="nova_quantidade_pedido_v2",
                     )
                     preco_novo = st.number_input(
                         "Preço unitário (R$)",
@@ -1113,7 +1113,7 @@ with aba_pedidos:
                         value=1.0,
                         step=1.0,
                         format="%.2f",
-                        key="novo_preco_unitario",
+                        key="novo_preco_unitario_v2",
                     )
                     cadastrar_pedido = st.form_submit_button("Cadastrar pedido")
                     if cadastrar_pedido:
@@ -1159,14 +1159,14 @@ with aba_pedidos:
                     opcoes_compra_editar.append(compra_atual)
                 opcoes_compra_editar = sorted(opcoes_compra_editar)
 
-                with st.form(f"form_editar_pedido_{id_pedido_editar}", clear_on_submit=True):
+                with st.form(f"form_editar_pedido_v2_{id_pedido_editar}"):
                     st.text_input("ID do pedido (fixo)", value=str(id_pedido_editar), disabled=True, key=f"id_pedido_fixo_{id_pedido_editar}")
                     compra_editada = st.selectbox(
                         "Compra vinculada",
                         options=opcoes_compra_editar,
                         index=opcoes_compra_editar.index(compra_atual),
                         format_func=lambda x: f"Compra {x}",
-                        key=f"compra_editada_{id_pedido_editar}",
+                        key=f"compra_editada_v2_{id_pedido_editar}",
                     )
                     produtos_edicao = listar_registros("produtos")
                     ids_produtos_edicao = [str(r["produto_id"]) for r in produtos_edicao]
@@ -1177,14 +1177,14 @@ with aba_pedidos:
                         "Produto", options=ids_produtos_edicao,
                         index=ids_produtos_edicao.index(produto_atual) if produto_atual in ids_produtos_edicao else 0,
                         format_func=lambda x: next((f"{r['nome_produto']} ({r['produto_id']})" for r in produtos_edicao if str(r['produto_id']) == str(x)), str(x)),
-                        key=f"produto_editado_{id_pedido_editar}",
+                        key=f"produto_editado_v2_{id_pedido_editar}",
                     ) if ids_produtos_edicao else ""
                     quantidade_editada = st.number_input(
                         "Quantidade",
                         min_value=1,
                         value=max(1, int(pedido.get("quantidade") or 1)),
                         step=1,
-                        key=f"quantidade_editada_{id_pedido_editar}",
+                        key=f"quantidade_editada_v2_{id_pedido_editar}",
                     )
                     preco_editado = st.number_input(
                         "Preço unitário (R$)",
@@ -1193,7 +1193,7 @@ with aba_pedidos:
                         value=min(9_999_999_999.99, max(0.01, float(pedido.get("preco_unitario") or 0.01))),
                         step=1.0,
                         format="%.2f",
-                        key=f"preco_editado_{id_pedido_editar}",
+                        key=f"preco_editado_v2_{id_pedido_editar}",
                     )
                     salvar_edicao_pedido = st.form_submit_button("Salvar alterações")
                     if salvar_edicao_pedido:
@@ -1277,7 +1277,7 @@ with aba_produtos:
         dados_produtos = listar_registros("produtos")
         with st.expander("Cadastrar produto", expanded=False):
             st.caption(f"Próximo ID sugerido: {proximo_produto_id()} (gerado automaticamente)")
-            with st.form("form_cadastrar_produto", clear_on_submit=True):
+            with st.form("form_cadastrar_produto"):
                 nome_produto_novo = st.text_input("Nome do produto", max_chars=120)
                 categoria_nova = st.text_input("Categoria", value="Geral", max_chars=80)
                 preco_produto_novo = st.number_input("Preço unitário (R$)", min_value=0.0, max_value=9_999_999_999.99, value=10.0, step=1.0, format="%.2f", key="preco_produto_novo")
@@ -1298,7 +1298,7 @@ with aba_produtos:
                 ids_produtos = [str(r["produto_id"]) for r in dados_produtos]
                 produto_escolhido = st.selectbox("Selecione o produto", ids_produtos, format_func=lambda x: next((f"{r['nome_produto']} ({r['produto_id']})" for r in dados_produtos if str(r['produto_id']) == str(x)), str(x)), key="produto_editar_selecao")
                 produto_registro = next(r for r in dados_produtos if str(r["produto_id"]) == str(produto_escolhido))
-                with st.form(f"form_editar_produto_{produto_escolhido}", clear_on_submit=True):
+                with st.form(f"form_editar_produto_{produto_escolhido}"):
                     st.caption(f"ID do produto: {produto_escolhido} (fixo; não pode ser alterado)")
                     nome_produto_editado = st.text_input("Nome do produto", value=str(produto_registro.get("nome_produto") or ""), key=f"nome_produto_{produto_escolhido}")
                     categoria_produto_editada = st.text_input("Categoria", value=str(produto_registro.get("categoria") or "Geral"), key=f"categoria_produto_{produto_escolhido}")
