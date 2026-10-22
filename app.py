@@ -5,14 +5,14 @@ import streamlit as st
 import plotly.express as px
 
 from db import (
-    testar_conexao,
     listar_registros,
     inserir_registro,
     atualizar_registro,
     excluir_registro,
-    importar_csv_para_supabase,
+    proximo_id,
+    proximo_cliente_id,
+    importar_dataframe_para_supabase,
 )
-
 
 PASTA_PROJETO = Path(__file__).parent
 PASTA_DADOS = PASTA_PROJETO / "dados_processados"
@@ -34,14 +34,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-try:
-    if testar_conexao():
-        st.success("Conexão com o Supabase estabelecida!")
-    else:
-        st.error("Não foi possível confirmar a conexão.")
-except Exception as erro:
-    st.error("Falha ao conectar ao banco de dados.")
-    st.caption(f"Detalhes técnicos: {type(erro).__name__}")
     
 # Estilos
 
@@ -314,15 +306,56 @@ st.markdown(
 # Leitura dos dados
 
 @st.cache_data
-def carregar_dados():
-    compras = pd.read_csv(PASTA_DADOS / "compras_limpo.csv")
-    pedidos = pd.read_csv(PASTA_DADOS / "pedidos_limpo.csv")
-    validacao = pd.read_csv(PASTA_DADOS / "validacao.csv")
-
-    return compras, pedidos, validacao
+def carregar_validacao():
+    return pd.read_csv(PASTA_DADOS / "validacao.csv")
 
 
-compras, pedidos, validacao = carregar_dados()
+# Compras e pedidos vêm diretamente do Supabase para refletir as alterações do CRUD.
+try:
+    compras = pd.DataFrame(listar_registros("compras"))
+    pedidos = pd.DataFrame(listar_registros("pedidos"))
+    if compras.empty and len(compras.columns) == 0:
+        compras = pd.DataFrame(columns=[
+            "id_compra", "cliente_id", "data_compra", "valor_total", "metodo_pagamento"
+        ])
+    if pedidos.empty and len(pedidos.columns) == 0:
+        pedidos = pd.DataFrame(columns=[
+            "id_pedido", "id_compra", "produto_id", "quantidade", "preco_unitario"
+        ])
+except Exception as erro:
+    st.error("Não foi possível carregar os dados do banco de dados.")
+    st.caption(f"Detalhes técnicos: {type(erro).__name__}")
+    compras = pd.DataFrame(columns=[
+        "id_compra", "cliente_id", "data_compra", "valor_total", "metodo_pagamento"
+    ])
+    pedidos = pd.DataFrame(columns=[
+        "id_pedido", "id_compra", "produto_id", "quantidade", "preco_unitario"
+    ])
+
+validacao = carregar_validacao()
+
+# Mantém tipos consistentes mesmo quando as tabelas estão vazias.
+for coluna in ["id_compra", "cliente_id"]:
+    if coluna in compras.columns:
+        compras[coluna] = pd.to_numeric(compras[coluna], errors="coerce").astype("Int64")
+if "valor_total" in compras.columns:
+    compras["valor_total"] = pd.to_numeric(compras["valor_total"], errors="coerce")
+if "data_compra" in compras.columns:
+    compras["data_compra"] = pd.to_datetime(compras["data_compra"], errors="coerce")
+
+for coluna in ["id_pedido", "id_compra", "quantidade"]:
+    if coluna in pedidos.columns:
+        pedidos[coluna] = pd.to_numeric(pedidos[coluna], errors="coerce").astype("Int64")
+if "preco_unitario" in pedidos.columns:
+    pedidos["preco_unitario"] = pd.to_numeric(pedidos["preco_unitario"], errors="coerce")
+if "produto_id" not in pedidos.columns:
+    pedidos["produto_id"] = pd.Series(dtype="object")
+
+validacao["valor_total"] = pd.to_numeric(validacao.get("valor_total"), errors="coerce")
+validacao["valor_calculado"] = pd.to_numeric(validacao.get("valor_calculado"), errors="coerce")
+validacao["situacao"] = validacao.get("situacao", pd.Series(dtype="object")).fillna(
+    "SITUAÇÃO NÃO INFORMADA"
+)
 
 
 # Preparação dos dados
@@ -752,178 +785,169 @@ st.divider()
 st.header("Gerenciamento de dados")
 st.write("Consulte e gerencie os registros armazenados no Supabase.")
 
+# Importação opcional de um CSV escolhido pelo usuário.
+with st.expander("Importar dados de um arquivo CSV"):
+    st.caption(
+        "Envie um CSV para adicionar registros diretamente ao Supabase. "
+        "O arquivo precisa ter as colunas da tabela escolhida. "
+        "Se o ID principal não estiver preenchido, ele será gerado automaticamente."
+    )
 
-from pathlib import Path
+    with st.form("form_importar_csv", clear_on_submit=True):
+        tabela_csv = st.selectbox(
+            "Tabela de destino",
+            options=["compras", "pedidos"],
+            format_func=lambda x: "Compras" if x == "compras" else "Pedidos",
+            key="tabela_destino_csv",
+        )
+        arquivo_csv = st.file_uploader(
+            "Selecione um arquivo CSV",
+            type=["csv"],
+            key="arquivo_csv_supabase",
+        )
+        importar_arquivo = st.form_submit_button("Importar CSV")
 
-PASTA_DADOS = Path(__file__).parent / "dados_processados"
-
-st.warning(
-    "Importe os CSVs apenas se as tabelas estiverem vazias "
-    "ou se quiser adicionar registros que ainda não existem."
-)
-
-if st.button("Importar CSVs para o Supabase"):
-    try:
-        compras_csv = PASTA_DADOS / "compras_limpo.csv"
-        pedidos_csv = PASTA_DADOS / "pedidos_limpo.csv"
-
-        if not compras_csv.exists() or not pedidos_csv.exists():
-            st.error("Não encontrei os dois arquivos CSV.")
-        else:
-            quantidade_compras = importar_csv_para_supabase(
-                str(compras_csv), "compras"
-            )
-
-            quantidade_pedidos = importar_csv_para_supabase(
-                str(pedidos_csv), "pedidos"
-            )
-
-            st.success(
-                f"Importação concluída! "
-                f"Compras inseridas: {quantidade_compras}. "
-                f"Pedidos inseridos: {quantidade_pedidos}."
-            )
-
-            st.rerun()
-
-    except Exception as erro:
-        st.error(f"Erro na importação: {erro}")
+        if importar_arquivo:
+            if arquivo_csv is None:
+                st.warning("Selecione um arquivo CSV antes de importar.")
+            else:
+                try:
+                    df_csv = pd.read_csv(arquivo_csv)
+                    quantidade = importar_dataframe_para_supabase(df_csv, tabela_csv)
+                    st.success(
+                        f"Importação concluída. Registros adicionados: {quantidade}."
+                    )
+                    st.rerun()
+                except Exception as erro:
+                    st.error("Não foi possível importar o arquivo CSV.")
+                    st.code(str(erro))
 
 aba_compras, aba_pedidos = st.tabs(["Compras", "Pedidos"])
 
-
+METODOS_PAGAMENTO = ["Cartão de Crédito", "Cartão de Débito", "Boleto", "Pix"]
 
 with aba_compras:
-    st.subheader("Registros de compras")
+    st.subheader("Compras")
 
     try:
         dados_compras = listar_registros("compras")
+        clientes_existentes = sorted({
+            int(r["cliente_id"])
+            for r in dados_compras
+            if r.get("cliente_id") is not None
+        })
 
-        # CADASTRAR
+        # CADASTRAR COMPRA
         with st.expander("Cadastrar nova compra"):
-            with st.form("form_cadastrar_compra"):
-                id_compra = st.number_input(
-                    "ID da compra",
-                    min_value=1,
-                    step=1,
-                    key="novo_id_compra",
-                )
+            st.caption(f"ID da próxima compra: {proximo_id('compras')} (gerado automaticamente)")
+            cliente_opcoes = ["Novo cliente (gerar ID)"] + clientes_existentes
 
-                cliente_id = st.number_input(
-                    "ID do cliente",
-                    min_value=1,
-                    step=1,
-                    key="novo_cliente_id",
+            with st.form("form_cadastrar_compra", clear_on_submit=True):
+                cliente_escolhido = st.selectbox(
+                    "Cliente",
+                    options=cliente_opcoes,
+                    format_func=lambda x: x if isinstance(x, str) else f"Cliente {x}",
+                    key="novo_cliente_escolhido",
                 )
-
-                data_compra = st.date_input(
+                data_compra_nova = st.date_input(
                     "Data da compra",
                     key="nova_data_compra",
                 )
-
-                valor_total = st.number_input(
+                valor_total_novo = st.number_input(
                     "Valor total (R$)",
                     min_value=0.01,
+                    value=10.0,
                     step=10.0,
                     format="%.2f",
                     key="novo_valor_total",
                 )
-
-                metodo_pagamento = st.selectbox(
+                metodo_novo = st.selectbox(
                     "Método de pagamento",
-                    ["Cartão", "Boleto", "Pix"],
+                    options=METODOS_PAGAMENTO,
                     key="novo_metodo_pagamento",
                 )
+                cadastrar_compra = st.form_submit_button("Cadastrar compra")
 
-                cadastrar = st.form_submit_button(
-                    "Cadastrar compra"
-                )
-
-                if cadastrar:
+                if cadastrar_compra:
                     try:
+                        cliente_novo_id = (
+                            proximo_cliente_id()
+                            if cliente_escolhido == "Novo cliente (gerar ID)"
+                            else int(cliente_escolhido)
+                        )
                         inserir_registro(
                             "compras",
                             {
-                                "id_compra": int(id_compra),
-                                "cliente_id": int(cliente_id),
-                                "data_compra": data_compra,
-                                "valor_total": float(valor_total),
-                                "metodo_pagamento": metodo_pagamento,
+                                "id_compra": proximo_id("compras"),
+                                "cliente_id": cliente_novo_id,
+                                "data_compra": data_compra_nova,
+                                "valor_total": float(valor_total_novo),
+                                "metodo_pagamento": metodo_novo,
                             },
                         )
-                        st.success("Compra cadastrada com sucesso!")
+                        st.success(
+                            f"Compra cadastrada! ID da compra: {proximo_id('compras') - 1}. "
+                            f"ID do cliente: {cliente_novo_id}."
+                        )
                         st.rerun()
-
                     except Exception as erro:
                         st.error("Não foi possível cadastrar a compra.")
-                        st.code(str(erro)
-                    )
+                        st.code(str(erro))
 
-        # EDITAR
+        # EDITAR COMPRA
         with st.expander("Editar compra existente"):
             if dados_compras:
-                ids_compras = [
-                    registro["id_compra"]
-                    for registro in dados_compras
-                ]
-
+                ids_compras = [int(r["id_compra"]) for r in dados_compras]
                 id_editar = st.selectbox(
                     "Selecione a compra",
                     options=ids_compras,
                     format_func=lambda x: f"Compra {x}",
                     key="selecionar_compra_editar",
                 )
-
-                registro = next(
-                    r for r in dados_compras
-                    if r["id_compra"] == id_editar
+                registro = next(r for r in dados_compras if int(r["id_compra"]) == id_editar)
+                data_original = registro.get("data_compra")
+                data_atual = (
+                    pd.to_datetime(data_original).date()
+                    if data_original is not None and pd.notna(data_original)
+                    else pd.Timestamp.today().date()
                 )
+                metodo_original = registro.get("metodo_pagamento") or "Cartão de Crédito"
+                # Normaliza o rótulo antigo "Cartão" para a opção válida de crédito.
+                metodo_atual = "Cartão de Crédito" if metodo_original == "Cartão" else metodo_original
+                if metodo_atual not in METODOS_PAGAMENTO:
+                    metodo_atual = "Cartão de Crédito"
 
-                data_atual = pd.to_datetime(
-                    registro["data_compra"]
-                ).date()
-
-                metodos = ["Cartão", "Boleto", "Pix"]
-                metodo_atual = registro["metodo_pagamento"]
-
-                if metodo_atual not in metodos:
-                    metodos.append(metodo_atual)
-
-                with st.form(f"form_editar_compra_{id_editar}"):
+                with st.form(f"form_editar_compra_{id_editar}", clear_on_submit=True):
+                    st.caption(f"ID da compra: {id_editar} (não pode ser alterado)")
                     cliente_editado = st.number_input(
                         "ID do cliente",
                         min_value=1,
-                        value=int(registro["cliente_id"]),
+                        value=max(1, int(registro.get("cliente_id") or 1)),
                         key=f"cliente_editado_{id_editar}",
                     )
-
                     data_editada = st.date_input(
                         "Data da compra",
                         value=data_atual,
                         key=f"data_editada_{id_editar}",
                     )
-
+                    valor_original = registro.get("valor_total")
                     valor_editado = st.number_input(
                         "Valor total (R$)",
                         min_value=0.01,
-                        value=float(registro["valor_total"]),
+                        value=max(0.01, float(valor_original or 0.01)),
                         step=10.0,
                         format="%.2f",
                         key=f"valor_editado_{id_editar}",
                     )
-
                     metodo_editado = st.selectbox(
                         "Método de pagamento",
-                        options=metodos,
-                        index=metodos.index(metodo_atual),
+                        options=METODOS_PAGAMENTO,
+                        index=METODOS_PAGAMENTO.index(metodo_atual),
                         key=f"metodo_editado_{id_editar}",
                     )
+                    salvar_edicao_compra = st.form_submit_button("Salvar alterações")
 
-                    salvar_edicao = st.form_submit_button(
-                        "Salvar alterações"
-                    )
-
-                    if salvar_edicao:
+                    if salvar_edicao_compra:
                         try:
                             atualizar_registro(
                                 "compras",
@@ -937,92 +961,238 @@ with aba_compras:
                             )
                             st.success("Compra atualizada com sucesso!")
                             st.rerun()
-
                         except Exception as erro:
                             st.error("Não foi possível editar a compra.")
-                            st.caption(
-                                f"Detalhes técnicos: {type(erro).__name__}"
-                            )
+                            st.code(str(erro))
             else:
                 st.info("Não há compras para editar.")
 
-        # EXCLUIR
+        # EXCLUIR COMPRA
         with st.expander("Excluir compra"):
             if dados_compras:
-                id_excluir = st.selectbox(
+                id_excluir_compra = st.selectbox(
                     "Selecione a compra para excluir",
-                    options=[
-                        registro["id_compra"]
-                        for registro in dados_compras
-                    ],
+                    options=[int(r["id_compra"]) for r in dados_compras],
                     format_func=lambda x: f"Compra {x}",
                     key="selecionar_compra_excluir",
                 )
-
                 with st.form("form_excluir_compra"):
-                    confirmar_exclusao = st.checkbox(
+                    confirmar_exclusao_compra = st.checkbox(
                         "Confirmo que desejo excluir esta compra."
                     )
-
-                    excluir = st.form_submit_button(
-                        "Excluir compra"
-                    )
-
-                    if excluir:
-                        if confirmar_exclusao:
+                    excluir_compra = st.form_submit_button("Excluir compra")
+                    if excluir_compra:
+                        if confirmar_exclusao_compra:
                             try:
-                                quantidade = excluir_registro(
-                                    "compras",
-                                    id_excluir,
-                                )
-
-                                if quantidade:
-                                    st.success(
-                                        "Compra excluída com sucesso!"
-                                    )
+                                excluidos = excluir_registro("compras", id_excluir_compra)
+                                if excluidos:
+                                    st.success("Compra excluída com sucesso!")
                                 else:
-                                    st.warning(
-                                        "A compra não foi encontrada."
-                                    )
-
+                                    st.warning("A compra não foi encontrada.")
                                 st.rerun()
-
                             except Exception as erro:
                                 st.error(
                                     "Não foi possível excluir a compra. "
-                                    "Verifique se existem pedidos "
-                                    "vinculados a ela."
+                                    "Verifique se existem pedidos vinculados a ela."
                                 )
-                                st.caption(
-                                    f"Detalhes técnicos: {type(erro).__name__}"
-                                )
+                                st.code(str(erro))
                         else:
-                            st.warning(
-                                "Marque a confirmação antes de excluir."
-                            )
+                            st.warning("Marque a confirmação antes de excluir.")
             else:
                 st.info("Não há compras para excluir.")
 
-        # CONSULTAR
+        # CONSULTAR COMPRAS
         st.divider()
         st.subheader("Tabela de compras")
-
         dados_compras = listar_registros("compras")
-
         if dados_compras:
-            st.dataframe(
-                dados_compras,
-                use_container_width=True,
-                hide_index=True,
-            )
+            st.dataframe(pd.DataFrame(dados_compras), use_container_width=True, hide_index=True)
         else:
             st.info("Nenhuma compra cadastrada.")
-
         st.caption(f"Total de registros: {len(dados_compras)}")
 
     except Exception as erro:
         st.error("Não foi possível carregar o gerenciamento de compras.")
-        st.caption(f"Detalhes técnicos: {type(erro).__name__}")
+        st.code(str(erro))
+
+with aba_pedidos:
+    st.subheader("Pedidos")
+
+    try:
+        dados_pedidos = listar_registros("pedidos")
+        compras_disponiveis = listar_registros("compras")
+        ids_compras_disponiveis = sorted({
+            int(r["id_compra"]) for r in compras_disponiveis
+        })
+
+        # CADASTRAR PEDIDO
+        with st.expander("Cadastrar novo pedido"):
+            st.caption(f"ID do próximo pedido: {proximo_id('pedidos')} (gerado automaticamente)")
+            if ids_compras_disponiveis:
+                with st.form("form_cadastrar_pedido", clear_on_submit=True):
+                    compra_do_pedido = st.selectbox(
+                        "Compra vinculada",
+                        options=ids_compras_disponiveis,
+                        format_func=lambda x: f"Compra {x}",
+                        key="nova_compra_pedido",
+                    )
+                    produto_novo = st.text_input(
+                        "ID do produto",
+                        key="novo_produto_id",
+                    )
+                    quantidade_nova = st.number_input(
+                        "Quantidade",
+                        min_value=1,
+                        value=1,
+                        step=1,
+                        key="nova_quantidade_pedido",
+                    )
+                    preco_novo = st.number_input(
+                        "Preço unitário (R$)",
+                        min_value=0.01,
+                        value=1.0,
+                        step=1.0,
+                        format="%.2f",
+                        key="novo_preco_unitario",
+                    )
+                    cadastrar_pedido = st.form_submit_button("Cadastrar pedido")
+                    if cadastrar_pedido:
+                        try:
+                            if not produto_novo.strip():
+                                st.warning("Informe o ID do produto.")
+                            else:
+                                inserir_registro(
+                                    "pedidos",
+                                    {
+                                        "id_pedido": proximo_id("pedidos"),
+                                        "id_compra": int(compra_do_pedido),
+                                        "produto_id": produto_novo.strip(),
+                                        "quantidade": int(quantidade_nova),
+                                        "preco_unitario": float(preco_novo),
+                                    },
+                                )
+                                st.success("Pedido cadastrado com sucesso!")
+                                st.rerun()
+                        except Exception as erro:
+                            st.error("Não foi possível cadastrar o pedido.")
+                            st.code(str(erro))
+            else:
+                st.info("Cadastre uma compra antes de adicionar um pedido.")
+
+        # EDITAR PEDIDO
+        with st.expander("Editar pedido existente"):
+            if dados_pedidos:
+                ids_pedidos = [int(r["id_pedido"]) for r in dados_pedidos]
+                id_pedido_editar = st.selectbox(
+                    "Selecione o pedido",
+                    options=ids_pedidos,
+                    format_func=lambda x: f"Pedido {x}",
+                    key="selecionar_pedido_editar",
+                )
+                pedido = next(r for r in dados_pedidos if int(r["id_pedido"]) == id_pedido_editar)
+                compra_atual = int(pedido["id_compra"])
+                opcoes_compra_editar = list(ids_compras_disponiveis)
+                if compra_atual not in opcoes_compra_editar:
+                    opcoes_compra_editar.append(compra_atual)
+                opcoes_compra_editar = sorted(opcoes_compra_editar)
+
+                with st.form(f"form_editar_pedido_{id_pedido_editar}", clear_on_submit=True):
+                    st.caption(f"ID do pedido: {id_pedido_editar} (não pode ser alterado)")
+                    compra_editada = st.selectbox(
+                        "Compra vinculada",
+                        options=opcoes_compra_editar,
+                        index=opcoes_compra_editar.index(compra_atual),
+                        format_func=lambda x: f"Compra {x}",
+                        key=f"compra_editada_{id_pedido_editar}",
+                    )
+                    produto_editado = st.text_input(
+                        "ID do produto",
+                        value=str(pedido.get("produto_id") or ""),
+                        key=f"produto_editado_{id_pedido_editar}",
+                    )
+                    quantidade_editada = st.number_input(
+                        "Quantidade",
+                        min_value=1,
+                        value=max(1, int(pedido.get("quantidade") or 1)),
+                        step=1,
+                        key=f"quantidade_editada_{id_pedido_editar}",
+                    )
+                    preco_editado = st.number_input(
+                        "Preço unitário (R$)",
+                        min_value=0.01,
+                        value=max(0.01, float(pedido.get("preco_unitario") or 0.01)),
+                        step=1.0,
+                        format="%.2f",
+                        key=f"preco_editado_{id_pedido_editar}",
+                    )
+                    salvar_edicao_pedido = st.form_submit_button("Salvar alterações")
+                    if salvar_edicao_pedido:
+                        try:
+                            if not produto_editado.strip():
+                                st.warning("Informe o ID do produto.")
+                            else:
+                                atualizar_registro(
+                                    "pedidos",
+                                    id_pedido_editar,
+                                    {
+                                        "id_compra": int(compra_editada),
+                                        "produto_id": produto_editado.strip(),
+                                        "quantidade": int(quantidade_editada),
+                                        "preco_unitario": float(preco_editado),
+                                    },
+                                )
+                                st.success("Pedido atualizado com sucesso!")
+                                st.rerun()
+                        except Exception as erro:
+                            st.error("Não foi possível editar o pedido.")
+                            st.code(str(erro))
+            else:
+                st.info("Não há pedidos para editar.")
+
+        # EXCLUIR PEDIDO
+        with st.expander("Excluir pedido"):
+            if dados_pedidos:
+                id_pedido_excluir = st.selectbox(
+                    "Selecione o pedido para excluir",
+                    options=[int(r["id_pedido"]) for r in dados_pedidos],
+                    format_func=lambda x: f"Pedido {x}",
+                    key="selecionar_pedido_excluir",
+                )
+                with st.form("form_excluir_pedido"):
+                    confirmar_exclusao_pedido = st.checkbox(
+                        "Confirmo que desejo excluir este pedido."
+                    )
+                    excluir_pedido = st.form_submit_button("Excluir pedido")
+                    if excluir_pedido:
+                        if confirmar_exclusao_pedido:
+                            try:
+                                excluidos = excluir_registro("pedidos", id_pedido_excluir)
+                                if excluidos:
+                                    st.success("Pedido excluído com sucesso!")
+                                else:
+                                    st.warning("O pedido não foi encontrado.")
+                                st.rerun()
+                            except Exception as erro:
+                                st.error("Não foi possível excluir o pedido.")
+                                st.code(str(erro))
+                        else:
+                            st.warning("Marque a confirmação antes de excluir.")
+            else:
+                st.info("Não há pedidos para excluir.")
+
+        # CONSULTAR PEDIDOS
+        st.divider()
+        st.subheader("Tabela de pedidos")
+        dados_pedidos = listar_registros("pedidos")
+        if dados_pedidos:
+            st.dataframe(pd.DataFrame(dados_pedidos), use_container_width=True, hide_index=True)
+        else:
+            st.info("Nenhum pedido cadastrado.")
+        st.caption(f"Total de registros: {len(dados_pedidos)}")
+
+    except Exception as erro:
+        st.error("Não foi possível carregar o gerenciamento de pedidos.")
+        st.code(str(erro))
 
 
 # Rodapé
