@@ -20,19 +20,19 @@ from db import (
 PASTA_PROJETO = Path(__file__).parent
 PASTA_DADOS = PASTA_PROJETO / "dados_processados"
 
-ROSA = "#B85D7B"
-ROSA_CLARO = "#E8C3CE"
-AMEIXA = "#765064"
-FUNDO = "#FBF8F5"
+ROSA = "#774EBF"
+ROSA_CLARO = "#E1C3FF"
+AMEIXA = "#774EBF"
+FUNDO = "#FCF7EE"
 BRANCO = "#FFFFFF"
-TEXTO = "#35313A"
-TEXTO_SECUNDARIO = "#655965"
-LINHA = "#E9E1E2"
+TEXTO = "#302743"
+TEXTO_SECUNDARIO = "#665A77"
+LINHA = "#E1D7EB"
 
 
 st.set_page_config(
-    page_title="Data Quality Studio",
-    page_icon="📊",
+    page_title="Kraken Hub | Atlética T.I.",
+    page_icon="🦑",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -45,260 +45,126 @@ st.markdown(
     <style>
     :root {
         color-scheme: light;
-        --dq-rose: #B85D7B;
-        --dq-plum: #765064;
-        --dq-pink: #E8C3CE;
-        --dq-line: #E9E1E2;
-        --dq-bg: #FBF8F5;
-        --dq-text: #35313A;
-        --dq-muted: #655965;
+        --dq-purple: #774EBF;
+        --dq-lilac: #E1C3FF;
+        --dq-cream: #FCF7EE;
+        --dq-yellow: #F9CC74;
+        --dq-white: #FFFFFF;
+        --dq-text: #302743;
+        --dq-muted: #665A77;
+        --dq-line: #E1D7EB;
     }
 
     html, body, [data-testid="stAppViewContainer"],
-    [data-testid="stMain"], [data-testid="stMainBlockContainer"] {
-        background: #FBF8F5 !important;
-        color: #35313A !important;
-    }
-
-    .stApp {
-        background: #FBF8F5 !important;
-        color: #35313A !important;
+    [data-testid="stMain"], [data-testid="stMainBlockContainer"], .stApp {
+        background: var(--dq-cream) !important;
+        color: var(--dq-text) !important;
+        scroll-behavior: smooth;
     }
 
     [data-testid="stHeader"] {
-        background: #FBF8F5 !important;
+        background: var(--dq-cream) !important;
     }
 
     [data-testid="stMainBlockContainer"] {
         max-width: 1500px;
-        padding: 2.2rem 2.5rem 1.5rem;
+        padding: 1rem 2.5rem 1.5rem;
+        scroll-behavior: smooth;
     }
 
     h1, h2, h3, h4 {
-        color: #35313A !important;
+        color: var(--dq-text) !important;
         letter-spacing: -0.035em !important;
     }
+    h1 { font-size: clamp(2.1rem, 4vw, 3.2rem) !important; font-weight: 750 !important; line-height: 1.12 !important; }
+    h2 { font-size: 1.35rem !important; font-weight: 650 !important; }
+    h3 { font-size: 1.02rem !important; font-weight: 650 !important; }
+    p, label { color: var(--dq-muted); }
 
-    h1 {
-        font-size: clamp(2.1rem, 4vw, 3.2rem) !important;
-        font-weight: 650 !important;
-        line-height: 1.12 !important;
-    }
-
-    h2 {
-        font-size: 1.35rem !important;
-        font-weight: 600 !important;
-    }
-
-    h3 {
-        font-size: 1.02rem !important;
-        font-weight: 600 !important;
-    }
-
-    p, label {
-        color: #655965;
-    }
-
-    .dq-brand {
+    .kraken-nav {
+        position: sticky;
+        top: 0;
+        z-index: 999;
         display: flex;
         align-items: center;
-        gap: 10px;
-        color: #35313A;
-        font-size: 1.05rem;
-        font-weight: 600;
-        letter-spacing: -0.025em;
-        padding: 0.25rem 0 1.8rem;
-    }
-
-    .dq-mark {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 34px;
-        height: 34px;
-        border-radius: 50%;
-        background: #F0DCE2;
-        color: #96506A;
-        font-size: 1.4rem;
-    }
-
-    .dq-brand-accent {
-        color: #B85D7B;
-    }
-
-    .dq-eyebrow {
-        font-size: 0.7rem;
-        font-weight: 650;
-        letter-spacing: 0.15em;
-        color: #765064;
-        margin-bottom: 0.65rem;
-    }
-
-    .dq-intro {
-        font-size: 0.98rem;
-        line-height: 1.7;
-        color: #655965 !important;
-        max-width: 650px;
-        margin-top: 0.8rem;
-    }
-
-    .dq-rule {
-        border: none;
-        border-top: 1px solid #E9E1E2;
-        margin: 1.65rem 0;
-    }
-
-    .dq-kpi {
-        height: 100%;
-        min-height: 112px;
-        padding: 1.1rem 1.15rem;
-        border: 1px solid #E9E1E2;
-        border-radius: 12px;
-        background: #FFFFFF;
-    }
-
-    .dq-kpi-label {
-        font-size: 0.8rem;
-        color: #655965 !important;
-        margin-bottom: 0.65rem;
-    }
-
-    .dq-kpi-value {
-        font-size: clamp(1.3rem, 2vw, 1.9rem);
-        font-weight: 650;
-        letter-spacing: -0.045em;
-        color: #35313A !important;
-        overflow-wrap: anywhere;
-        line-height: 1.2;
-    }
-
-    .dq-kpi-accent {
-        width: 27px;
-        height: 3px;
-        background: #B85D7B;
-        border-radius: 5px;
-        margin-top: 0.9rem;
-    }
-
-    .dq-status {
-        padding: 0.85rem 1rem;
-        border: 1px solid #EED6DC;
-        border-radius: 9px;
-        background: #F9EAE9;
-        color: #80515C;
-        font-size: 0.88rem;
-        line-height: 1.6;
-        margin: 0.5rem 0 1rem;
-    }
-
-    .dq-footer {
-        display: flex;
         justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        color: #655965 !important;
-        font-size: 0.78rem;
-        line-height: 1.6;
-        padding: 0.2rem 0 0.8rem;
-    }
-
-    .dq-footer span {
-        color: #655965 !important;
-    }
-
-    [data-testid="stCaptionContainer"],
-    [data-testid="stCaptionContainer"] p {
-        color: #655965 !important;
-        opacity: 1 !important;
-        font-size: 0.8rem;
-    }
-
-    [data-testid="stWidgetLabel"],
-    [data-testid="stWidgetLabel"] p,
-    [data-testid="stSelectbox"] label,
-    [data-testid="stNumberInput"] label {
-        color: #625563 !important;
-        font-size: 0.82rem;
-    }
-
-    [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
-        background: #FFFFFF !important;
-        border-color: #DCCDD4 !important;
-        color: #35313A !important;
-        border-radius: 8px !important;
-    }
-
-    [data-testid="stSelectbox"] div[data-baseweb="select"] * {
-        color: #35313A !important;
-    }
-
-    [data-testid="stNumberInput"] input {
-        background: #FFFFFF !important;
-        border-color: #DCCDD4 !important;
-        color: #35313A !important;
-        border-radius: 8px !important;
-        -webkit-text-fill-color: #35313A !important;
-    }
-
-    [data-baseweb="popover"],
-    [data-baseweb="menu"],
-    [role="listbox"] {
-        background: #FFFFFF !important;
-        color: #35313A !important;
-    }
-
-    [role="option"] {
-        background: #FFFFFF !important;
-        color: #35313A !important;
-    }
-
-    [role="option"]:hover {
-        background: #F2E5E9 !important;
-    }
-
-    [data-testid="stDataFrame"] {
-        background: #FFFFFF !important;
-        border: 1px solid #E2D7DD !important;
-        border-radius: 9px !important;
-        overflow: hidden;
-    }
-
-    [data-testid="stDataFrame"] iframe {
-        background: #FFFFFF !important;
-    }
-
-    [data-testid="stPlotlyChart"] {
-        width: 100% !important;
-        min-width: 0 !important;
-        background: transparent !important;
-    }
-
-    [data-testid="stHorizontalBlock"] {
-        min-width: 0;
         gap: 1rem;
+        flex-wrap: wrap;
+        padding: 0.8rem 1rem;
+        margin: 0 0 1.1rem;
+        background: rgba(252, 247, 238, 0.96);
+        border: 1px solid var(--dq-line);
+        border-radius: 16px;
+        box-shadow: 0 6px 22px rgba(67, 42, 105, 0.07);
+        backdrop-filter: blur(12px);
     }
+    .kraken-nav-brand { color: var(--dq-purple) !important; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
+    .kraken-nav-links { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+    .kraken-nav a { color: var(--dq-text) !important; text-decoration: none !important; font-size: 0.82rem; font-weight: 650; padding: 0.48rem 0.7rem; border-radius: 9px; }
+    .kraken-nav a:hover { background: var(--dq-lilac); color: var(--dq-purple) !important; }
 
-    [data-testid="stAlert"] {
-        border-radius: 9px !important;
+    .kraken-cover {
+        position: relative;
+        overflow: hidden;
+        padding: clamp(1.8rem, 5vw, 4.2rem);
+        margin: 0.2rem 0 2rem;
+        border-radius: 24px;
+        background: linear-gradient(125deg, #774EBF 0%, #6940AC 68%, #55338F 100%);
+        color: #FFFFFF;
+        box-shadow: 0 18px 45px rgba(91, 56, 150, 0.18);
     }
+    .kraken-cover:after {
+        content: "";
+        position: absolute;
+        width: 260px;
+        height: 260px;
+        right: -70px;
+        top: -95px;
+        border: 42px solid rgba(225, 195, 255, 0.18);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+    .kraken-cover-kicker { color: #F9CC74; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 0.9rem; }
+    .kraken-cover h1 { color: #FFFFFF !important; font-size: clamp(2.5rem, 6vw, 4.7rem) !important; margin: 0; }
+    .kraken-cover p { position: relative; z-index: 1; max-width: 660px; margin: 1rem 0 0; color: rgba(255,255,255,0.88) !important; font-size: 1.02rem; line-height: 1.75; }
+    .kraken-cover-tag { display: inline-block; margin-top: 1.3rem; padding: 0.45rem 0.75rem; border: 1px solid rgba(255,255,255,0.3); border-radius: 999px; color: #FFFFFF; font-size: 0.78rem; }
 
-    .stButton button {
-        border-radius: 8px;
-    }
+    .dq-eyebrow { font-size: 0.7rem; font-weight: 750; letter-spacing: 0.15em; color: var(--dq-purple); margin-bottom: 0.65rem; }
+    .dq-intro { font-size: 0.98rem; line-height: 1.7; color: var(--dq-muted) !important; max-width: 650px; margin-top: 0.8rem; }
+    .dq-rule { border: none; border-top: 1px solid var(--dq-line); margin: 1.65rem 0; }
+    .dq-kpi { height: 100%; min-height: 112px; padding: 1.1rem 1.15rem; border: 1px solid var(--dq-line); border-radius: 14px; background: var(--dq-white); }
+    .dq-kpi-label { font-size: 0.8rem; color: var(--dq-muted) !important; margin-bottom: 0.65rem; }
+    .dq-kpi-value { font-size: clamp(1.3rem, 2vw, 1.9rem); font-weight: 750; letter-spacing: -0.045em; color: var(--dq-text) !important; overflow-wrap: anywhere; line-height: 1.2; }
+    .dq-kpi-accent { width: 27px; height: 4px; background: var(--dq-yellow); border-radius: 5px; margin-top: 0.9rem; }
+    .dq-status { padding: 0.85rem 1rem; border: 1px solid #E1C3FF; border-radius: 10px; background: #F3E8FF; color: #52338C; font-size: 0.88rem; line-height: 1.6; margin: 0.5rem 0 1rem; }
+    .dq-footer { text-align: center; color: var(--dq-muted) !important; font-size: 0.8rem; line-height: 1.6; padding: 0.5rem 0 1rem; }
+    .dq-footer strong { color: var(--dq-purple) !important; }
+
+    [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p { color: var(--dq-muted) !important; opacity: 1 !important; font-size: 0.8rem; }
+    [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] p,
+    [data-testid="stSelectbox"] label, [data-testid="stNumberInput"] label { color: var(--dq-muted) !important; font-size: 0.82rem; }
+    [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+    [data-testid="stNumberInput"] input { background: #FFFFFF !important; border-color: var(--dq-line) !important; color: var(--dq-text) !important; border-radius: 9px !important; }
+    [data-testid="stSelectbox"] div[data-baseweb="select"] *, [data-testid="stNumberInput"] input { color: var(--dq-text) !important; -webkit-text-fill-color: var(--dq-text) !important; }
+    [data-baseweb="popover"], [data-baseweb="menu"], [role="listbox"], [role="option"] { background: #FFFFFF !important; color: var(--dq-text) !important; }
+    [role="option"]:hover { background: #F3E8FF !important; }
+    [data-testid="stDataFrame"] { background: #FFFFFF !important; border: 1px solid var(--dq-line) !important; border-radius: 10px !important; overflow: hidden; }
+    [data-testid="stDataFrame"] iframe { background: #FFFFFF !important; }
+    [data-testid="stPlotlyChart"] { width: 100% !important; min-width: 0 !important; background: transparent !important; }
+    [data-testid="stHorizontalBlock"] { min-width: 0; gap: 1rem; }
+    [data-testid="stAlert"] { border-radius: 10px !important; }
+    .stButton button, [data-testid="stFormSubmitButton"] button { border-radius: 9px; border-color: var(--dq-purple); }
+    .stButton button[kind="primary"], [data-testid="stFormSubmitButton"] button[kind="primary"] { background: var(--dq-purple); color: #FFFFFF; }
+    .stButton button:hover, [data-testid="stFormSubmitButton"] button:hover { border-color: var(--dq-purple); color: var(--dq-purple); }
 
     @media (max-width: 900px) {
-        [data-testid="stMainBlockContainer"] {
-            padding: 1.25rem 1rem !important;
-        }
-
-        h1 {
-            font-size: 2.15rem !important;
-        }
-
-        .dq-kpi {
-            min-height: 95px;
-            padding: 0.9rem;
-        }
+        [data-testid="stMainBlockContainer"] { padding: 0.8rem 1rem 1.2rem !important; }
+        .kraken-nav { position: sticky; top: 0; border-radius: 12px; padding: 0.7rem; }
+        .kraken-nav-links { gap: 0.15rem; }
+        .kraken-nav a { padding: 0.4rem 0.5rem; font-size: 0.75rem; }
+        .kraken-cover { border-radius: 18px; }
+        h1 { font-size: 2.15rem !important; }
+        .dq-kpi { min-height: 95px; padding: 0.9rem; }
     }
     </style>
     """,
@@ -443,34 +309,27 @@ def exibir_tabela(df, colunas_monetarias=()):
     st.dataframe(df.style.format(formatters, na_rep="—"), use_container_width=True, hide_index=True)
 
 
-# Cabeçalho
+# Navegação e capa
 
 st.markdown(
     """
-    <div class="dq-brand">
-        <span class="dq-mark">◌</span>
-        <span>Data Quality <span class="dq-brand-accent">Studio</span></span>
+    <nav class="kraken-nav">
+        <span class="kraken-nav-brand">◉ KRAKEN HUB</span>
+        <div class="kraken-nav-links">
+            <a href="#inicio">Início</a>
+            <a href="#compras">Compras</a>
+            <a href="#produtos">Produtos</a>
+            <a href="#qualidade">Qualidade</a>
+            <a href="#gerenciamento">Gerenciar dados</a>
+        </div>
+    </nav>
+    <div class="kraken-cover" id="inicio">
+        <div class="kraken-cover-kicker">Atlética T.I. · UMC</div>
+        <h1>Kraken Hub</h1>
+        <p>O espaço da Atlética T.I. para organizar compras, acompanhar produtos e manter os dados em ordem.</p>
+        <span class="kraken-cover-tag">GESTÃO · ORGANIZAÇÃO · CONTROLE</span>
     </div>
     """,
-    unsafe_allow_html=True
-)
-
-st.markdown(
-    '<div class="dq-eyebrow">CONSULTA · ANÁLISE · DADOS</div>',
-    unsafe_allow_html=True
-)
-
-st.title("Data Quality Studio")
-
-st.markdown(
-    '<p class="dq-intro">'
-    'Consulta e análise de dados de compras e pedidos.'
-    '</p>',
-    unsafe_allow_html=True
-)
-
-st.markdown(
-    '<hr class="dq-rule">',
     unsafe_allow_html=True
 )
 
@@ -504,11 +363,11 @@ for coluna, rotulo, valor in indicadores:
             unsafe_allow_html=True
         )
 
-st.caption("Soma dos valores informados nas compras.")
 
 
 # Filtros
 
+st.markdown(' <div id="compras"></div> '.strip(), unsafe_allow_html=True)
 st.markdown('<hr class="dq-rule">', unsafe_allow_html=True)
 
 st.subheader("Compras")
@@ -682,7 +541,7 @@ with grafico2:
             line=dict(color=ROSA, width=2.5),
             marker=dict(size=7, color=ROSA),
             fill="tozeroy",
-            fillcolor="rgba(184,93,123,0.08)"
+            fillcolor="rgba(119,78,191,0.12)"
         )
 
         fig_valores.update_layout(
@@ -723,6 +582,7 @@ with grafico2:
 
 # Produtos
 
+st.markdown(' <div id="produtos"></div> '.strip(), unsafe_allow_html=True)
 st.markdown('<hr class="dq-rule">', unsafe_allow_html=True)
 
 st.subheader("Produtos")
@@ -792,9 +652,10 @@ else:
 
 # Validação
 
+st.markdown(' <div id="qualidade"></div> '.strip(), unsafe_allow_html=True)
 st.markdown('<hr class="dq-rule">', unsafe_allow_html=True)
 
-st.subheader("Inconsistências")
+st.subheader("Qualidade dos dados")
 
 problemas = validacao[
     validacao["situacao"] != "OK"
@@ -816,6 +677,7 @@ else:
     exibir_tabela(problemas, ["valor_total", "valor_calculado", "diferenca"])
 
 # GERENCIAMENTO DE DADOS - CRUD
+st.markdown(' <div id="gerenciamento"></div> '.strip(), unsafe_allow_html=True)
 st.divider()
 st.header("Gerenciamento de dados")
 st.write("Consulte e gerencie os registros armazenados no Supabase.")
@@ -1352,10 +1214,7 @@ st.markdown('<hr class="dq-rule">', unsafe_allow_html=True)
 
 st.markdown(
     """
-    <div class="dq-footer">
-        <span>Data Quality Studio · Python e PySpark</span>
-        <span>Dados fictícios para fins de demonstração.</span>
-    </div>
+    <div class="dq-footer"><strong>Feito por — Atlética T.I.</strong></div>
     """,
     unsafe_allow_html=True
 )
