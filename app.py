@@ -68,8 +68,9 @@ st.markdown(
 
     [data-testid="stMainBlockContainer"] {
         max-width: 1500px;
-        padding: 1rem 2.5rem 1.5rem;
+        padding: 6.8rem 2.5rem 1.5rem;
         scroll-behavior: smooth;
+        scroll-padding-top: 7rem;
     }
 
     h1, h2, h3, h4 {
@@ -82,26 +83,30 @@ st.markdown(
     p, label { color: var(--dq-muted); }
 
     .kraken-nav {
-        position: sticky;
-        top: 0;
-        z-index: 999;
+        position: fixed;
+        top: 0.65rem;
+        left: max(1rem, calc((100vw - 1500px) / 2 + 2.5rem));
+        right: max(1rem, calc((100vw - 1500px) / 2 + 2.5rem));
+        z-index: 999999;
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        box-sizing: border-box;
         padding: 0.8rem 1rem;
-        margin: 0 0 1.1rem;
-        background: rgba(252, 247, 238, 0.96);
+        margin: 0;
+        background: rgba(252, 247, 238, 0.98);
         border: 1px solid var(--dq-line);
         border-radius: 16px;
-        box-shadow: 0 6px 22px rgba(67, 42, 105, 0.07);
+        box-shadow: 0 6px 22px rgba(67, 42, 105, 0.10);
         backdrop-filter: blur(12px);
     }
-    .kraken-nav-brand { color: var(--dq-purple) !important; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
-    .kraken-nav-links { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
-    .kraken-nav a { color: var(--dq-text) !important; text-decoration: none !important; font-size: 0.82rem; font-weight: 650; padding: 0.48rem 0.7rem; border-radius: 9px; }
-    .kraken-nav a:hover { background: var(--dq-lilac); color: var(--dq-purple) !important; }
+    .kraken-nav-brand { color: var(--dq-purple) !important; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; flex: 0 0 auto; }
+    .kraken-nav-links { display: flex; align-items: center; justify-content: flex-end; gap: 0.25rem; flex-wrap: nowrap; min-width: 0; }
+    .kraken-nav a { color: var(--dq-text) !important; text-decoration: none !important; font-size: 0.82rem; font-weight: 650; padding: 0.48rem 0.65rem; border-radius: 9px; white-space: nowrap; }
+    .kraken-nav a:hover, .kraken-nav a:focus-visible { background: var(--dq-lilac); color: var(--dq-purple) !important; }
+    [id] { scroll-margin-top: 7rem; }
 
     .kraken-cover {
         position: relative;
@@ -158,13 +163,40 @@ st.markdown(
     .stButton button:hover, [data-testid="stFormSubmitButton"] button:hover { border-color: var(--dq-purple); color: var(--dq-purple); }
 
     @media (max-width: 900px) {
-        [data-testid="stMainBlockContainer"] { padding: 0.8rem 1rem 1.2rem !important; }
-        .kraken-nav { position: sticky; top: 0; border-radius: 12px; padding: 0.7rem; }
-        .kraken-nav-links { gap: 0.15rem; }
-        .kraken-nav a { padding: 0.4rem 0.5rem; font-size: 0.75rem; }
+        [data-testid="stMainBlockContainer"] {
+            padding: 7.4rem 1rem 1.2rem !important;
+            scroll-padding-top: 7.8rem;
+        }
+        .kraken-nav {
+            top: 0.45rem;
+            left: 0.55rem;
+            right: 0.55rem;
+            padding: 0.6rem 0.7rem;
+            border-radius: 12px;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+        }
+        .kraken-nav-brand { font-size: 0.78rem; }
+        .kraken-nav-links {
+            width: 100%;
+            justify-content: flex-start;
+            gap: 0.15rem;
+            overflow-x: auto;
+            overscroll-behavior-x: contain;
+            scrollbar-width: none;
+            padding-bottom: 1px;
+        }
+        .kraken-nav-links::-webkit-scrollbar { display: none; }
+        .kraken-nav a { padding: 0.4rem 0.55rem; font-size: 0.75rem; }
         .kraken-cover { border-radius: 18px; }
         h1 { font-size: 2.15rem !important; }
         .dq-kpi { min-height: 95px; padding: 0.9rem; }
+    }
+    @media (max-width: 420px) {
+        [data-testid="stMainBlockContainer"] { padding-top: 7.7rem !important; }
+        .kraken-nav { padding: 0.55rem 0.6rem; }
+        .kraken-nav-links { margin-right: -0.1rem; }
+        .kraken-nav a { font-size: 0.72rem; padding: 0.38rem 0.48rem; }
     }
     </style>
     """,
@@ -1214,7 +1246,7 @@ st.markdown('<hr class="dq-rule">', unsafe_allow_html=True)
 
 st.markdown(
     """
-    <div class="dq-footer"><strong>Feito por — Atlética T.I.</strong></div>
+    <div class="dq-footer"><strong>Feito por Bianca Ordine — Atlética T.I.</strong></div>
     """,
     unsafe_allow_html=True
 )
