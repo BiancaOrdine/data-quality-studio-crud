@@ -223,7 +223,12 @@ def importar_csv_para_supabase(caminho_csv, tabela):
                     continue
 
                 cursor.execute(
-                    sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+                    
+                cursor.execute(
+                    sql.SQL(
+                        "INSERT INTO {} ({}) VALUES ({}) "
+                        "ON CONFLICT ({}) DO NOTHING"
+                    ).format(
                         sql.Identifier(tabela),
                         sql.SQL(", ").join(
                             sql.Identifier(c) for c in colunas
@@ -231,12 +236,14 @@ def importar_csv_para_supabase(caminho_csv, tabela):
                         sql.SQL(", ").join(
                             sql.Placeholder() for _ in colunas
                         ),
+                        sql.Identifier(id_coluna),
                     ),
                     tuple(registro[c] for c in colunas),
                 )
 
-                ids_existentes.add(id_registro)
-                inseridos += 1
+                if cursor.rowcount == 1:
+                    ids_existentes.add(id_registro)
+                    inseridos += 1
 
     return inseridos
 
