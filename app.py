@@ -855,13 +855,9 @@ with aba_compras:
                         st.rerun()
 
                     except Exception as erro:
-                        st.error(
-                            "Não foi possível cadastrar. "
-                            "Verifique se o ID já existe."
-                        )
-                        st.caption(
-                            f"Detalhes técnicos: {type(erro).__name__}"
-                        )
+                        st.error("Não foi possível cadastrar a compra.")
+                        st.code(str(erro)
+                    )
 
         # EDITAR
         with st.expander("Editar compra existente"):
