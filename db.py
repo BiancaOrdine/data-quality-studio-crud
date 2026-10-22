@@ -162,10 +162,11 @@ def importar_csv_para_supabase(caminho_csv, tabela):
         "pedidos": {
             "id_pedido": "id_pedido",
             "id_compra": "id_compra",
-            "id_do_produto": "produto_id",
+            "produto_id": "produto_id",
             "quantidade": "quantidade",
-            "preco_unitário": "preco_unitario",
+            "preco_unitario": "preco_unitario",
         },
+
     }
 
     if tabela not in mapeamentos:
