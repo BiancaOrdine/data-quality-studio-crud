@@ -11,8 +11,11 @@ from db import (
     excluir_registro,
     proximo_id,
     proximo_cliente_id,
+    proximo_produto_id,
+    inicializar_tabela_produtos,
     importar_dataframe_para_supabase,
 )
+
 
 PASTA_PROJETO = Path(__file__).parent
 PASTA_DADOS = PASTA_PROJETO / "dados_processados"
@@ -29,7 +32,7 @@ LINHA = "#E9E1E2"
 
 st.set_page_config(
     page_title="Data Quality Studio",
-    page_icon="◌",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -314,6 +317,8 @@ def carregar_validacao():
 try:
     compras = pd.DataFrame(listar_registros("compras"))
     pedidos = pd.DataFrame(listar_registros("pedidos"))
+    inicializar_tabela_produtos()
+    produtos = pd.DataFrame(listar_registros("produtos"))
     if compras.empty and len(compras.columns) == 0:
         compras = pd.DataFrame(columns=[
             "id_compra", "cliente_id", "data_compra", "valor_total", "metodo_pagamento"
@@ -322,6 +327,8 @@ try:
         pedidos = pd.DataFrame(columns=[
             "id_pedido", "id_compra", "produto_id", "quantidade", "preco_unitario"
         ])
+    if produtos.empty and len(produtos.columns) == 0:
+        produtos = pd.DataFrame(columns=["produto_id", "nome_produto", "categoria", "preco_unitario"])
 except Exception as erro:
     st.error("Não foi possível carregar os dados do banco de dados.")
     st.caption(f"Detalhes técnicos: {type(erro).__name__}")
@@ -331,8 +338,11 @@ except Exception as erro:
     pedidos = pd.DataFrame(columns=[
         "id_pedido", "id_compra", "produto_id", "quantidade", "preco_unitario"
     ])
+    produtos = pd.DataFrame(columns=["produto_id", "nome_produto", "categoria", "preco_unitario"])
 
-validacao = carregar_validacao()
+# A tabela de inconsistências é recalculada com os dados atuais do Supabase.
+validacao = pd.DataFrame(columns=["id_compra", "valor_total", "valor_calculado", "diferenca", "situacao"])
+
 
 # Mantém tipos consistentes mesmo quando as tabelas estão vazias.
 for coluna in ["id_compra", "cliente_id"]:
@@ -394,6 +404,26 @@ validacao["situacao"] = validacao["situacao"].fillna(
     "SITUAÇÃO NÃO INFORMADA"
 )
 
+# Reconciliação em tempo real: compara o total da compra com a soma dos itens dos pedidos.
+if not compras.empty:
+    if pedidos.empty:
+        totais_pedidos = pd.DataFrame(columns=["id_compra", "valor_calculado"])
+    else:
+        pedidos_calc = pedidos.copy()
+        pedidos_calc["quantidade"] = pd.to_numeric(pedidos_calc["quantidade"], errors="coerce").fillna(0)
+        pedidos_calc["preco_unitario"] = pd.to_numeric(pedidos_calc["preco_unitario"], errors="coerce").fillna(0)
+        pedidos_calc["subtotal"] = pedidos_calc["quantidade"] * pedidos_calc["preco_unitario"]
+        totais_pedidos = pedidos_calc.groupby("id_compra", as_index=False)["subtotal"].sum().rename(columns={"subtotal": "valor_calculado"})
+    validacao = compras[["id_compra", "valor_total"]].merge(totais_pedidos, on="id_compra", how="left")
+    validacao["valor_calculado"] = validacao["valor_calculado"].fillna(0.0)
+    validacao["diferenca"] = (validacao["valor_total"] - validacao["valor_calculado"]).round(2)
+    validacao["situacao"] = validacao.apply(
+        lambda r: "OK" if abs(float(r["diferenca"] or 0)) < 0.01 else ("Compra sem pedidos" if float(r["valor_calculado"] or 0) == 0 else "Valor divergente"), axis=1
+    )
+else:
+    validacao = pd.DataFrame(columns=["id_compra", "valor_total", "valor_calculado", "diferenca", "situacao"])
+
+
 
 def formatar_moeda(valor):
     return (
@@ -402,6 +432,15 @@ def formatar_moeda(valor):
         .replace(".", ",")
         .replace("X", ".")
     )
+
+
+def exibir_tabela(df, colunas_monetarias=()):
+    """Exibe valores monetários no padrão brasileiro, sem alterar os dados gravados."""
+    if df is None or df.empty:
+        st.info("Nenhum registro cadastrado.")
+        return
+    formatters = {c: (lambda v: formatar_moeda(float(v)) if pd.notna(v) else "—") for c in colunas_monetarias if c in df.columns}
+    st.dataframe(df.style.format(formatters, na_rep="—"), use_container_width=True, hide_index=True)
 
 
 # Cabeçalho
@@ -774,11 +813,7 @@ else:
         unsafe_allow_html=True
     )
 
-    st.dataframe(
-        problemas,
-        use_container_width=True,
-        hide_index=True
-    )
+    exibir_tabela(problemas, ["valor_total", "valor_calculado", "diferenca"])
 
 # GERENCIAMENTO DE DADOS - CRUD
 st.divider()
@@ -796,8 +831,8 @@ with st.expander("Importar dados de um arquivo CSV"):
     with st.form("form_importar_csv", clear_on_submit=True):
         tabela_csv = st.selectbox(
             "Tabela de destino",
-            options=["compras", "pedidos"],
-            format_func=lambda x: "Compras" if x == "compras" else "Pedidos",
+            options=["compras", "pedidos", "produtos"],
+            format_func=lambda x: {"compras": "Compras", "pedidos": "Pedidos", "produtos": "Produtos"}[x],
             key="tabela_destino_csv",
         )
         arquivo_csv = st.file_uploader(
@@ -819,10 +854,13 @@ with st.expander("Importar dados de um arquivo CSV"):
                     )
                     st.rerun()
                 except Exception as erro:
-                    st.error("Não foi possível importar o arquivo CSV.")
-                    st.code(str(erro))
+                    st.error("Não foi possível importar o CSV. Confira os nomes das colunas, os valores numéricos e se os registros relacionados já existem.")
+                    if isinstance(erro, ValueError):
+                        st.caption(str(erro))
+                    else:
+                        st.caption(f"Detalhes técnicos: {type(erro).__name__}")
 
-aba_compras, aba_pedidos = st.tabs(["Compras", "Pedidos"])
+aba_compras, aba_pedidos, aba_produtos = st.tabs(["Compras", "Pedidos", "Produtos"])
 
 METODOS_PAGAMENTO = ["Cartão de Crédito", "Cartão de Débito", "Boleto", "Pix"]
 
@@ -839,7 +877,8 @@ with aba_compras:
 
         # CADASTRAR COMPRA
         with st.expander("Cadastrar nova compra"):
-            st.caption(f"ID da próxima compra: {proximo_id('compras')} (gerado automaticamente)")
+            st.text_input("ID da compra (automático)", value=str(proximo_id("compras")), disabled=True, key=f"id_compra_nova_visual_{proximo_id('compras')}")
+            st.caption("O ID é gerado pelo sistema e não pode ser editado.")
             cliente_opcoes = ["Novo cliente (gerar ID)"] + clientes_existentes
 
             with st.form("form_cadastrar_compra", clear_on_submit=True):
@@ -856,6 +895,7 @@ with aba_compras:
                 valor_total_novo = st.number_input(
                     "Valor total (R$)",
                     min_value=0.01,
+                    max_value=9_999_999_999.99,
                     value=10.0,
                     step=10.0,
                     format="%.2f",
@@ -891,8 +931,13 @@ with aba_compras:
                         )
                         st.rerun()
                     except Exception as erro:
-                        st.error("Não foi possível cadastrar a compra.")
-                        st.code(str(erro))
+                        mensagem = str(erro).lower()
+                        if "numeric field overflow" in mensagem or "numeric_value_out_of_range" in mensagem:
+                            st.warning("Valor muito alto. Informe um valor menor que R$ 10.000.000.000,00, com até duas casas decimais.")
+                        elif "check constraint" in mensagem or "metodo_pagamento" in mensagem:
+                            st.warning("Esse método de pagamento não é aceito pela configuração atual do banco. Confira as opções permitidas no Supabase.")
+                        else:
+                            st.error("Não foi possível cadastrar a compra. Confira os campos e tente novamente.")
 
         # EDITAR COMPRA
         with st.expander("Editar compra existente"):
@@ -902,7 +947,7 @@ with aba_compras:
                     "Selecione a compra",
                     options=ids_compras,
                     format_func=lambda x: f"Compra {x}",
-                    key="selecionar_compra_editar",
+                    key="selecionar_compra_editar_" + "_".join(map(str, ids_compras)),
                 )
                 registro = next(r for r in dados_compras if int(r["id_compra"]) == id_editar)
                 data_original = registro.get("data_compra")
@@ -918,7 +963,7 @@ with aba_compras:
                     metodo_atual = "Cartão de Crédito"
 
                 with st.form(f"form_editar_compra_{id_editar}", clear_on_submit=True):
-                    st.caption(f"ID da compra: {id_editar} (não pode ser alterado)")
+                    st.text_input("ID da compra (fixo)", value=str(id_editar), disabled=True, key=f"id_compra_fixo_{id_editar}")
                     cliente_editado = st.number_input(
                         "ID do cliente",
                         min_value=1,
@@ -934,7 +979,8 @@ with aba_compras:
                     valor_editado = st.number_input(
                         "Valor total (R$)",
                         min_value=0.01,
-                        value=max(0.01, float(valor_original or 0.01)),
+                        max_value=9_999_999_999.99,
+                        value=min(9_999_999_999.99, max(0.01, float(valor_original or 0.01))),
                         step=10.0,
                         format="%.2f",
                         key=f"valor_editado_{id_editar}",
@@ -962,8 +1008,13 @@ with aba_compras:
                             st.success("Compra atualizada com sucesso!")
                             st.rerun()
                         except Exception as erro:
-                            st.error("Não foi possível editar a compra.")
-                            st.code(str(erro))
+                            mensagem = str(erro).lower()
+                            if "numeric field overflow" in mensagem or "numeric_value_out_of_range" in mensagem:
+                                st.warning("Valor muito alto. Informe um valor menor que R$ 10.000.000.000,00, com até duas casas decimais.")
+                            elif isinstance(erro, ValueError):
+                                st.warning(str(erro))
+                            else:
+                                st.error("Não foi possível editar a compra. Confira os campos e tente novamente.")
             else:
                 st.info("Não há compras para editar.")
 
@@ -974,7 +1025,7 @@ with aba_compras:
                     "Selecione a compra para excluir",
                     options=[int(r["id_compra"]) for r in dados_compras],
                     format_func=lambda x: f"Compra {x}",
-                    key="selecionar_compra_excluir",
+                    key="selecionar_compra_excluir_" + "_".join(str(int(r["id_compra"])) for r in dados_compras),
                 )
                 with st.form("form_excluir_compra"):
                     confirmar_exclusao_compra = st.checkbox(
@@ -1006,7 +1057,7 @@ with aba_compras:
         st.subheader("Tabela de compras")
         dados_compras = listar_registros("compras")
         if dados_compras:
-            st.dataframe(pd.DataFrame(dados_compras), use_container_width=True, hide_index=True)
+            exibir_tabela(pd.DataFrame(dados_compras), ["valor_total"])
         else:
             st.info("Nenhuma compra cadastrada.")
         st.caption(f"Total de registros: {len(dados_compras)}")
@@ -1027,7 +1078,8 @@ with aba_pedidos:
 
         # CADASTRAR PEDIDO
         with st.expander("Cadastrar novo pedido"):
-            st.caption(f"ID do próximo pedido: {proximo_id('pedidos')} (gerado automaticamente)")
+            st.text_input("ID do pedido (automático)", value=str(proximo_id("pedidos")), disabled=True, key=f"id_pedido_novo_visual_{proximo_id('pedidos')}")
+            st.caption("O ID é gerado pelo sistema e não pode ser editado.")
             if ids_compras_disponiveis:
                 with st.form("form_cadastrar_pedido", clear_on_submit=True):
                     compra_do_pedido = st.selectbox(
@@ -1036,10 +1088,17 @@ with aba_pedidos:
                         format_func=lambda x: f"Compra {x}",
                         key="nova_compra_pedido",
                     )
-                    produto_novo = st.text_input(
-                        "ID do produto",
-                        key="novo_produto_id",
-                    )
+                    produtos_disponiveis = listar_registros("produtos")
+                    ids_produtos = [str(r["produto_id"]) for r in produtos_disponiveis]
+                    if ids_produtos:
+                        produto_novo = st.selectbox(
+                            "Produto", options=ids_produtos,
+                            format_func=lambda x: next((f"{r['nome_produto']} ({r['produto_id']})" for r in produtos_disponiveis if str(r['produto_id']) == str(x)), str(x)),
+                            key="novo_produto_id",
+                        )
+                    else:
+                        produto_novo = ""
+                        st.info("Cadastre um produto na aba Produtos antes de criar um pedido.")
                     quantidade_nova = st.number_input(
                         "Quantidade",
                         min_value=1,
@@ -1050,6 +1109,7 @@ with aba_pedidos:
                     preco_novo = st.number_input(
                         "Preço unitário (R$)",
                         min_value=0.01,
+                        max_value=9_999_999_999.99,
                         value=1.0,
                         step=1.0,
                         format="%.2f",
@@ -1074,8 +1134,11 @@ with aba_pedidos:
                                 st.success("Pedido cadastrado com sucesso!")
                                 st.rerun()
                         except Exception as erro:
-                            st.error("Não foi possível cadastrar o pedido.")
-                            st.code(str(erro))
+                            mensagem = str(erro).lower()
+                            if "numeric field overflow" in mensagem or "numeric_value_out_of_range" in mensagem:
+                                st.warning("Preço muito alto. Informe um valor menor que R$ 10.000.000.000,00, com até duas casas decimais.")
+                            else:
+                                st.error("Não foi possível cadastrar o pedido. Confira os campos e tente novamente.")
             else:
                 st.info("Cadastre uma compra antes de adicionar um pedido.")
 
@@ -1087,7 +1150,7 @@ with aba_pedidos:
                     "Selecione o pedido",
                     options=ids_pedidos,
                     format_func=lambda x: f"Pedido {x}",
-                    key="selecionar_pedido_editar",
+                    key="selecionar_pedido_editar_" + "_".join(map(str, ids_pedidos)),
                 )
                 pedido = next(r for r in dados_pedidos if int(r["id_pedido"]) == id_pedido_editar)
                 compra_atual = int(pedido["id_compra"])
@@ -1097,7 +1160,7 @@ with aba_pedidos:
                 opcoes_compra_editar = sorted(opcoes_compra_editar)
 
                 with st.form(f"form_editar_pedido_{id_pedido_editar}", clear_on_submit=True):
-                    st.caption(f"ID do pedido: {id_pedido_editar} (não pode ser alterado)")
+                    st.text_input("ID do pedido (fixo)", value=str(id_pedido_editar), disabled=True, key=f"id_pedido_fixo_{id_pedido_editar}")
                     compra_editada = st.selectbox(
                         "Compra vinculada",
                         options=opcoes_compra_editar,
@@ -1105,11 +1168,17 @@ with aba_pedidos:
                         format_func=lambda x: f"Compra {x}",
                         key=f"compra_editada_{id_pedido_editar}",
                     )
-                    produto_editado = st.text_input(
-                        "ID do produto",
-                        value=str(pedido.get("produto_id") or ""),
+                    produtos_edicao = listar_registros("produtos")
+                    ids_produtos_edicao = [str(r["produto_id"]) for r in produtos_edicao]
+                    produto_atual = str(pedido.get("produto_id") or "")
+                    if produto_atual and produto_atual not in ids_produtos_edicao:
+                        ids_produtos_edicao.append(produto_atual)
+                    produto_editado = st.selectbox(
+                        "Produto", options=ids_produtos_edicao,
+                        index=ids_produtos_edicao.index(produto_atual) if produto_atual in ids_produtos_edicao else 0,
+                        format_func=lambda x: next((f"{r['nome_produto']} ({r['produto_id']})" for r in produtos_edicao if str(r['produto_id']) == str(x)), str(x)),
                         key=f"produto_editado_{id_pedido_editar}",
-                    )
+                    ) if ids_produtos_edicao else ""
                     quantidade_editada = st.number_input(
                         "Quantidade",
                         min_value=1,
@@ -1120,7 +1189,8 @@ with aba_pedidos:
                     preco_editado = st.number_input(
                         "Preço unitário (R$)",
                         min_value=0.01,
-                        value=max(0.01, float(pedido.get("preco_unitario") or 0.01)),
+                        max_value=9_999_999_999.99,
+                        value=min(9_999_999_999.99, max(0.01, float(pedido.get("preco_unitario") or 0.01))),
                         step=1.0,
                         format="%.2f",
                         key=f"preco_editado_{id_pedido_editar}",
@@ -1144,8 +1214,13 @@ with aba_pedidos:
                                 st.success("Pedido atualizado com sucesso!")
                                 st.rerun()
                         except Exception as erro:
-                            st.error("Não foi possível editar o pedido.")
-                            st.code(str(erro))
+                            mensagem = str(erro).lower()
+                            if "numeric field overflow" in mensagem or "numeric_value_out_of_range" in mensagem:
+                                st.warning("Preço muito alto. Informe um valor menor que R$ 10.000.000.000,00, com até duas casas decimais.")
+                            elif isinstance(erro, ValueError):
+                                st.warning(str(erro))
+                            else:
+                                st.error("Não foi possível editar o pedido. Confira os campos e tente novamente.")
             else:
                 st.info("Não há pedidos para editar.")
 
@@ -1156,7 +1231,7 @@ with aba_pedidos:
                     "Selecione o pedido para excluir",
                     options=[int(r["id_pedido"]) for r in dados_pedidos],
                     format_func=lambda x: f"Pedido {x}",
-                    key="selecionar_pedido_excluir",
+                    key="selecionar_pedido_excluir_" + "_".join(str(int(r["id_pedido"])) for r in dados_pedidos),
                 )
                 with st.form("form_excluir_pedido"):
                     confirmar_exclusao_pedido = st.checkbox(
@@ -1185,7 +1260,7 @@ with aba_pedidos:
         st.subheader("Tabela de pedidos")
         dados_pedidos = listar_registros("pedidos")
         if dados_pedidos:
-            st.dataframe(pd.DataFrame(dados_pedidos), use_container_width=True, hide_index=True)
+            exibir_tabela(pd.DataFrame(dados_pedidos), ["preco_unitario"])
         else:
             st.info("Nenhum pedido cadastrado.")
         st.caption(f"Total de registros: {len(dados_pedidos)}")
@@ -1193,6 +1268,82 @@ with aba_pedidos:
     except Exception as erro:
         st.error("Não foi possível carregar o gerenciamento de pedidos.")
         st.code(str(erro))
+
+
+with aba_produtos:
+    st.subheader("Produtos")
+    st.caption("Cadastre o catálogo de produtos usado pelos pedidos. Os IDs são gerados automaticamente.")
+    try:
+        dados_produtos = listar_registros("produtos")
+        with st.expander("Cadastrar produto", expanded=False):
+            st.caption(f"Próximo ID sugerido: {proximo_produto_id()} (gerado automaticamente)")
+            with st.form("form_cadastrar_produto", clear_on_submit=True):
+                nome_produto_novo = st.text_input("Nome do produto", max_chars=120)
+                categoria_nova = st.text_input("Categoria", value="Geral", max_chars=80)
+                preco_produto_novo = st.number_input("Preço unitário (R$)", min_value=0.0, max_value=9_999_999_999.99, value=10.0, step=1.0, format="%.2f", key="preco_produto_novo")
+                cadastrar_produto = st.form_submit_button("Cadastrar produto")
+                if cadastrar_produto:
+                    if not nome_produto_novo.strip():
+                        st.warning("Informe o nome do produto.")
+                    else:
+                        try:
+                            novo_id_produto = proximo_produto_id()
+                            inserir_registro("produtos", {"produto_id": novo_id_produto, "nome_produto": nome_produto_novo.strip(), "categoria": categoria_nova.strip() or "Geral", "preco_unitario": float(preco_produto_novo)})
+                            st.success(f"Produto {novo_id_produto} cadastrado.")
+                            st.rerun()
+                        except Exception as erro:
+                            st.error("Não foi possível cadastrar o produto. Confira os campos e tente novamente.")
+        with st.expander("Editar produto", expanded=False):
+            if dados_produtos:
+                ids_produtos = [str(r["produto_id"]) for r in dados_produtos]
+                produto_escolhido = st.selectbox("Selecione o produto", ids_produtos, format_func=lambda x: next((f"{r['nome_produto']} ({r['produto_id']})" for r in dados_produtos if str(r['produto_id']) == str(x)), str(x)), key="produto_editar_selecao")
+                produto_registro = next(r for r in dados_produtos if str(r["produto_id"]) == str(produto_escolhido))
+                with st.form(f"form_editar_produto_{produto_escolhido}", clear_on_submit=True):
+                    st.caption(f"ID do produto: {produto_escolhido} (fixo; não pode ser alterado)")
+                    nome_produto_editado = st.text_input("Nome do produto", value=str(produto_registro.get("nome_produto") or ""), key=f"nome_produto_{produto_escolhido}")
+                    categoria_produto_editada = st.text_input("Categoria", value=str(produto_registro.get("categoria") or "Geral"), key=f"categoria_produto_{produto_escolhido}")
+                    preco_produto_editado = st.number_input("Preço unitário (R$)", min_value=0.0, max_value=9_999_999_999.99, value=min(9_999_999_999.99, max(0.0, float(produto_registro.get("preco_unitario") or 0))), step=1.0, format="%.2f", key=f"preco_produto_{produto_escolhido}")
+                    salvar_produto = st.form_submit_button("Salvar alterações")
+                    if salvar_produto:
+                        if not nome_produto_editado.strip():
+                            st.warning("Informe o nome do produto.")
+                        else:
+                            try:
+                                atualizar_registro("produtos", produto_escolhido, {"nome_produto": nome_produto_editado.strip(), "categoria": categoria_produto_editada.strip() or "Geral", "preco_unitario": float(preco_produto_editado)})
+                                st.success("Produto atualizado com sucesso.")
+                                st.rerun()
+                            except Exception as erro:
+                                st.error("Não foi possível editar o produto.")
+            else:
+                st.info("Nenhum produto cadastrado.")
+        with st.expander("Excluir produto", expanded=False):
+            if dados_produtos:
+                produto_excluir = st.selectbox("Selecione o produto para excluir", [str(r["produto_id"]) for r in dados_produtos], format_func=lambda x: next((f"{r['nome_produto']} ({r['produto_id']})" for r in dados_produtos if str(r['produto_id']) == str(x)), str(x)), key="produto_excluir_selecao")
+                with st.form("form_excluir_produto"):
+                    confirmar_produto = st.checkbox("Confirmo que desejo excluir este produto.")
+                    excluir_produto_btn = st.form_submit_button("Excluir produto")
+                    if excluir_produto_btn:
+                        if confirmar_produto:
+                            # Impede apagar produtos ainda usados no histórico de pedidos.
+                            ids_usados = {str(r["produto_id"]) for r in listar_registros("pedidos")}
+                            if produto_excluir in ids_usados:
+                                st.warning("Este produto aparece em pedidos existentes e não pode ser excluído. Você pode editar nome, categoria ou preço.")
+                            else:
+                                excluir_registro("produtos", produto_excluir)
+                                st.success("Produto excluído.")
+                                st.rerun()
+                        else:
+                            st.warning("Marque a confirmação antes de excluir.")
+            else:
+                st.info("Nenhum produto cadastrado para excluir.")
+        st.divider()
+        st.subheader("Catálogo de produtos")
+        dados_produtos = listar_registros("produtos")
+        exibir_tabela(pd.DataFrame(dados_produtos), ["preco_unitario"])
+        st.caption(f"Total de produtos: {len(dados_produtos)}")
+    except Exception as erro:
+        st.error("Não foi possível carregar o gerenciamento de produtos.")
+        st.caption(f"Detalhes técnicos: {type(erro).__name__}")
 
 
 # Rodapé
