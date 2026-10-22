@@ -840,8 +840,86 @@ with aba_compras:
     except Exception as erro:
         st.error(f"Não foi possível consultar compras: {erro}")
 
-with aba_pedidos:
-    st.subheader("Registros de pedidos")
+
+with aba_compras:
+    st.subheader("Registros de compras")
+
+    with st.expander("Cadastrar nova compra"):
+        with st.form("form_cadastrar_compra"):
+            id_compra = st.number_input(
+                "ID da compra",
+                min_value=1,
+                step=1,
+                key="novo_id_compra",
+            )
+
+            cliente_id = st.number_input(
+                "ID do cliente",
+                min_value=1,
+                step=1,
+                key="novo_cliente_id",
+            )
+
+            data_compra = st.date_input(
+                "Data da compra",
+                key="nova_data_compra",
+            )
+
+            valor_total = st.number_input(
+                "Valor total (R$)",
+                min_value=0.01,
+                step=10.0,
+                format="%.2f",
+                key="novo_valor_total",
+            )
+
+            metodo_pagamento = st.selectbox(
+                "Método de pagamento",
+                options=["Cartão", "Boleto", "Pix"],
+                key="novo_metodo_pagamento",
+            )
+
+            cadastrar = st.form_submit_button(
+                "Cadastrar compra"
+            )
+
+            if cadastrar:
+                try:
+                    inserir_registro(
+                        "compras",
+                        {
+                            "id_compra": int(id_compra),
+                            "cliente_id": int(cliente_id),
+                            "data_compra": data_compra,
+                            "valor_total": float(valor_total),
+                            "metodo_pagamento": metodo_pagamento,
+                        },
+                    )
+
+                    st.success("Compra cadastrada com sucesso!")
+                    st.rerun()
+
+                except Exception as erro:
+                    st.error(
+                        "Não foi possível cadastrar a compra. "
+                        "Verifique se o ID já existe e se os dados "
+                        "estão corretos."
+                    )
+                    st.caption(
+                        f"Detalhes técnicos: {type(erro).__name__}"
+                    )
+
+    try:
+        dados_compras = listar_registros("compras")
+        st.dataframe(
+            dados_compras,
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.caption(f"Total de registros: {len(dados_compras)}")
+
+    except Exception as erro:
+        st.error(f"Não foi possível consultar compras: {erro}")
 
     try:
         dados_pedidos = listar_registros("pedidos")
