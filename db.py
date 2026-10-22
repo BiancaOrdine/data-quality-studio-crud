@@ -1,28 +1,9 @@
+
 import streamlit as st
 import psycopg
+import pandas as pd
 
-
-def conectar_banco():
-    config = st.secrets["connections"]["postgresql"]
-
-    return psycopg.connect(
-        host=config["host"],
-        port=config["port"],
-        dbname=config["database"],
-        user=config["username"],
-        password=config["password"],
-        sslmode="require",
-        connect_timeout=10,
-    )
-
-
-def testar_conexao():
-    with conectar_banco() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT 1;")
-            return cursor.fetchone()[0] == 1
-
-
+from pathlib import Path
 from psycopg import sql
 from psycopg.rows import dict_row
 
@@ -49,6 +30,27 @@ TABELAS_PERMITIDAS = {
         ],
     },
 }
+
+
+def conectar_banco():
+    config = st.secrets["connections"]["postgresql"]
+
+    return psycopg.connect(
+        host=config["host"],
+        port=config["port"],
+        dbname=config["database"],
+        user=config["username"],
+        password=config["password"],
+        sslmode="require",
+        connect_timeout=10,
+    )
+
+
+def testar_conexao():
+    with conectar_banco() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT 1;")
+            return cursor.fetchone()[0] == 1
 
 
 def listar_registros(tabela):
@@ -92,6 +94,7 @@ def inserir_registro(tabela, dados):
                 tuple(dados[c] for c in colunas),
             )
 
+
 def atualizar_registro(tabela, id_valor, dados):
     if tabela not in TABELAS_PERMITIDAS:
         raise ValueError("Tabela não permitida.")
@@ -125,7 +128,6 @@ def atualizar_registro(tabela, id_valor, dados):
                 ),
                 (*dados.values(), id_valor),
             )
-
             return cursor.rowcount
 
 
@@ -145,11 +147,8 @@ def excluir_registro(tabela, id_valor):
                 ),
                 (id_valor,),
             )
-
             return cursor.rowcount
 
-import pandas as pd
-from pathlib import Path
 
 def importar_csv_para_supabase(caminho_csv, tabela):
     mapeamentos = {
@@ -180,6 +179,7 @@ def importar_csv_para_supabase(caminho_csv, tabela):
     if set(df.columns) != set(mapa.keys()):
         raise ValueError(
             f"Colunas inesperadas em {caminho_csv}. "
+            f"Esperadas: {list(mapa.keys())}. "
             f"Encontradas: {list(df.columns)}"
         )
 
@@ -187,12 +187,16 @@ def importar_csv_para_supabase(caminho_csv, tabela):
 
     id_coluna = TABELAS_PERMITIDAS[tabela]["id"]
 
-    # Evita IDs repetidos dentro do próprio CSV
-    df = df.drop_duplicates(subset=[id_coluna], keep="first")
+    if df[id_coluna].isna().any():
+        raise ValueError(
+            f"O CSV contém IDs vazios na coluna {id_coluna}."
+        )
 
+    df = df.drop_duplicates(subset=[id_coluna], keep="first")
     df = df.astype(object).where(pd.notna(df), None)
-    registros = df.to_dict(orient="records")
+
     colunas = list(mapa.values())
+    registros = df.to_dict(orient="records")
 
     if not registros:
         return 0
@@ -201,29 +205,7 @@ def importar_csv_para_supabase(caminho_csv, tabela):
 
     with conectar_banco() as conn:
         with conn.cursor() as cursor:
-
-            # Consulta os IDs que já existem no Supabase
-            cursor.execute(
-                sql.SQL("SELECT {} FROM {}").format(
-                    sql.Identifier(id_coluna),
-                    sql.Identifier(tabela),
-                )
-            )
-
-            ids_existentes = {
-                str(linha[0]).strip()
-                for linha in cursor.fetchall()
-            }
-
             for registro in registros:
-                id_registro = str(registro[id_coluna]).strip()
-
-                # Não insere um registro cujo ID já existe
-                if id_registro in ids_existentes:
-                    continue
-
-                cursor.execute(
-                    
                 cursor.execute(
                     sql.SQL(
                         "INSERT INTO {} ({}) VALUES ({}) "
@@ -242,125 +224,6 @@ def importar_csv_para_supabase(caminho_csv, tabela):
                 )
 
                 if cursor.rowcount == 1:
-                    ids_existentes.add(id_registro)
                     inseridos += 1
 
     return inseridos
-
-    # Remove espaços extras dos nomes das colunas
-    df.columns = df.columns.str.strip()
-
-    mapa = mapeamentos[tabela]
-
-    # Confere se o CSV possui todas as colunas esperadas
-    colunas_esperadas = list(mapa.keys())
-
-    if set(df.columns) != set(colunas_esperadas):
-        raise ValueError(
-            f"Colunas inesperadas no arquivo {caminho_csv}. "
-            f"Esperadas: {colunas_esperadas}. "
-            f"Encontradas: {list(df.columns)}"
-        )
-
-    # Renomeia as colunas para corresponder ao Supabase
-    df = df.rename(columns=mapa)
-
-    # Converte valores vazios em NULL
-    df = df.astype(object).where(pd.notna(df), None)
-
-    colunas = list(mapa.values())
-    registros = df.to_dict(orient="records")
-
-    if not registros:
-        return 0
-
-    with conectar_banco() as conn:
-        with conn.cursor() as cursor:
-            for registro in registros:
-                cursor.execute(
-                    sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
-                        sql.Identifier(tabela),
-                        sql.SQL(", ").join(
-                            sql.Identifier(c) for c in colunas
-                        ),
-                        sql.SQL(", ").join(
-                            sql.Placeholder() for _ in colunas
-                        ),
-                    ),
-                    tuple(registro[c] for c in colunas),
-                )
-
-    return len(registros)
-
-
-import pandas as pd
-from pathlib import Path
-
-
-def importar_csv_para_supabase(caminho_csv, tabela):
-    mapeamentos = {
-        "compras": {
-            "id_compra": "id_compra",
-            "cliente_id": "cliente_id",
-            "data_compra": "data_compra",
-            "valor_total": "valor_total",
-            "metodo_pagamento": "metodo_pagamento",
-        },
-        "pedidos": {
-            "id_pedido": "id_pedido",
-            "id_compra": "id_compra",
-            "id_do_produto": "produto_id",
-            "quantidade": "quantidade",
-            "preco_unitário": "preco_unitario",
-        },
-    }
-
-    if tabela not in mapeamentos:
-        raise ValueError("Tabela não permitida.")
-
-    df = pd.read_csv(caminho_csv)
-
-    # Remove espaços extras dos nomes das colunas
-    df.columns = df.columns.str.strip()
-
-    mapa = mapeamentos[tabela]
-
-    # Confere se o CSV possui todas as colunas esperadas
-    colunas_esperadas = list(mapa.keys())
-
-    if set(df.columns) != set(colunas_esperadas):
-        raise ValueError(
-            f"Colunas inesperadas no arquivo {caminho_csv}. "
-            f"Esperadas: {colunas_esperadas}. "
-            f"Encontradas: {list(df.columns)}"
-        )
-
-    # Renomeia as colunas para corresponder ao Supabase
-    df = df.rename(columns=mapa)
-
-    # Converte valores vazios em NULL
-    df = df.astype(object).where(pd.notna(df), None)
-
-    colunas = list(mapa.values())
-    registros = df.to_dict(orient="records")
-
-    if not registros:
-        return 0
-
-    with conectar_banco() as conn:
-        with conn.cursor() as cursor:
-            for registro in registros:
-                cursor.execute(
-                    sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
-                        sql.Identifier(tabela),
-                        sql.SQL(", ").join(
-                            sql.Identifier(c) for c in colunas
-                        ),
-                        sql.SQL(", ").join(
-                            sql.Placeholder() for _ in colunas
-                        ),
-                    ),
-                    tuple(registro[c] for c in colunas),
-                )
-
-    return len(registros)
