@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 import pandas as pd
 import streamlit as st
@@ -9,9 +10,6 @@ from db import (
     inserir_registro,
     atualizar_registro,
     excluir_registro,
-    proximo_id,
-    proximo_cliente_id,
-    proximo_produto_id,
     inicializar_tabela_produtos,
     importar_dataframe_para_supabase,
 )
@@ -219,9 +217,15 @@ def carregar_validacao():
 
 # Compras e pedidos vêm diretamente do Supabase para refletir as alterações do CRUD.
 try:
+    # A inicialização cria a tabela e importa IDs legados; não precisa rodar
+    # novamente a cada interação do usuário.
+    if not st.session_state.get("_kraken_produtos_inicializados", False):
+        inicializar_tabela_produtos()
+        st.session_state["_kraken_produtos_inicializados"] = True
+
+    # Uma leitura por tabela nesta execução. O CRUD reutiliza estes dados.
     compras = pd.DataFrame(listar_registros("compras"))
     pedidos = pd.DataFrame(listar_registros("pedidos"))
-    inicializar_tabela_produtos()
     produtos = pd.DataFrame(listar_registros("produtos"))
     if compras.empty and len(compras.columns) == 0:
         compras = pd.DataFrame(columns=[
@@ -768,7 +772,14 @@ with aba_compras:
     st.subheader("Compras")
 
     try:
-        dados_compras = listar_registros("compras")
+        dados_compras = compras.to_dict(orient="records")
+        proximo_id_compra = max(
+            (int(r["id_compra"]) for r in dados_compras), default=0
+        ) + 1
+        proximo_id_cliente = max(
+            (int(r["cliente_id"]) for r in dados_compras if r.get("cliente_id") is not None),
+            default=0,
+        ) + 1
         clientes_existentes = sorted({
             int(r["cliente_id"])
             for r in dados_compras
@@ -777,7 +788,7 @@ with aba_compras:
 
         # CADASTRAR COMPRA
         with st.expander("Cadastrar nova compra"):
-            st.text_input("ID da compra (automático)", value=str(proximo_id("compras")), disabled=True, key=f"id_compra_nova_visual_{proximo_id('compras')}")
+            st.text_input("ID da compra (automático)", value=str(proximo_id_compra), disabled=True, key="id_compra_nova_visual")
             st.caption("O ID é gerado pelo sistema e não pode ser editado.")
             cliente_opcoes = ["Novo cliente (gerar ID)"] + clientes_existentes
 
@@ -811,14 +822,14 @@ with aba_compras:
                 if cadastrar_compra:
                     try:
                         cliente_novo_id = (
-                            proximo_cliente_id()
+                            proximo_id_cliente
                             if cliente_escolhido == "Novo cliente (gerar ID)"
                             else int(cliente_escolhido)
                         )
                         inserir_registro(
                             "compras",
                             {
-                                "id_compra": proximo_id("compras"),
+                                "id_compra": proximo_id_compra,
                                 "cliente_id": cliente_novo_id,
                                 "data_compra": data_compra_nova,
                                 "valor_total": float(valor_total_novo),
@@ -826,7 +837,7 @@ with aba_compras:
                             },
                         )
                         st.success(
-                            f"Compra cadastrada! ID da compra: {proximo_id('compras') - 1}. "
+                            f"Compra cadastrada! ID da compra: {proximo_id_compra}. "
                             f"ID do cliente: {cliente_novo_id}."
                         )
                         st.rerun()
@@ -955,7 +966,7 @@ with aba_compras:
         # CONSULTAR COMPRAS
         st.divider()
         st.subheader("Tabela de compras")
-        dados_compras = listar_registros("compras")
+        dados_compras = compras.to_dict(orient="records")
         if dados_compras:
             exibir_tabela(pd.DataFrame(dados_compras), ["valor_total"])
         else:
@@ -970,15 +981,18 @@ with aba_pedidos:
     st.subheader("Pedidos")
 
     try:
-        dados_pedidos = listar_registros("pedidos")
-        compras_disponiveis = listar_registros("compras")
+        dados_pedidos = pedidos.to_dict(orient="records")
+        proximo_id_pedido = max(
+            (int(r["id_pedido"]) for r in dados_pedidos), default=0
+        ) + 1
+        compras_disponiveis = compras.to_dict(orient="records")
         ids_compras_disponiveis = sorted({
             int(r["id_compra"]) for r in compras_disponiveis
         })
 
         # CADASTRAR PEDIDO
         with st.expander("Cadastrar novo pedido"):
-            st.text_input("ID do pedido (automático)", value=str(proximo_id("pedidos")), disabled=True, key=f"id_pedido_novo_visual_{proximo_id('pedidos')}")
+            st.text_input("ID do pedido (automático)", value=str(proximo_id_pedido), disabled=True, key="id_pedido_novo_visual")
             st.caption("O ID é gerado pelo sistema e não pode ser editado.")
             if ids_compras_disponiveis:
                 with st.form("form_cadastrar_pedido_v2"):
@@ -988,7 +1002,7 @@ with aba_pedidos:
                         format_func=lambda x: f"Compra {x}",
                         key="nova_compra_pedido_v2",
                     )
-                    produtos_disponiveis = listar_registros("produtos")
+                    produtos_disponiveis = produtos.to_dict(orient="records")
                     ids_produtos = [str(r["produto_id"]) for r in produtos_disponiveis]
                     if ids_produtos:
                         produto_novo = st.selectbox(
@@ -1024,7 +1038,7 @@ with aba_pedidos:
                                 inserir_registro(
                                     "pedidos",
                                     {
-                                        "id_pedido": proximo_id("pedidos"),
+                                        "id_pedido": proximo_id_pedido,
                                         "id_compra": int(compra_do_pedido),
                                         "produto_id": produto_novo.strip(),
                                         "quantidade": int(quantidade_nova),
@@ -1068,7 +1082,7 @@ with aba_pedidos:
                         format_func=lambda x: f"Compra {x}",
                         key=f"compra_editada_v2_{id_pedido_editar}",
                     )
-                    produtos_edicao = listar_registros("produtos")
+                    produtos_edicao = produtos.to_dict(orient="records")
                     ids_produtos_edicao = [str(r["produto_id"]) for r in produtos_edicao]
                     produto_atual = str(pedido.get("produto_id") or "")
                     if produto_atual and produto_atual not in ids_produtos_edicao:
@@ -1158,7 +1172,7 @@ with aba_pedidos:
         # CONSULTAR PEDIDOS
         st.divider()
         st.subheader("Tabela de pedidos")
-        dados_pedidos = listar_registros("pedidos")
+        dados_pedidos = pedidos.to_dict(orient="records")
         if dados_pedidos:
             exibir_tabela(pd.DataFrame(dados_pedidos), ["preco_unitario"])
         else:
@@ -1174,9 +1188,15 @@ with aba_produtos:
     st.subheader("Produtos")
     st.caption("Cadastre o catálogo de produtos usado pelos pedidos. Os IDs são gerados automaticamente.")
     try:
-        dados_produtos = listar_registros("produtos")
+        dados_produtos = produtos.to_dict(orient="records")
+        numeros_produtos = [
+            int(match.group(1))
+            for registro_produto in dados_produtos
+            if (match := re.fullmatch(r"P(\d+)", str(registro_produto.get("produto_id", ""))))
+        ]
+        proximo_codigo_produto = f"P{max(numeros_produtos, default=0) + 1:03d}"
         with st.expander("Cadastrar produto", expanded=False):
-            st.caption(f"Próximo ID sugerido: {proximo_produto_id()} (gerado automaticamente)")
+            st.caption(f"Próximo ID sugerido: {proximo_codigo_produto} (gerado automaticamente)")
             with st.form("form_cadastrar_produto"):
                 nome_produto_novo = st.text_input("Nome do produto", max_chars=120)
                 categoria_nova = st.text_input("Categoria", value="Geral", max_chars=80)
@@ -1187,7 +1207,7 @@ with aba_produtos:
                         st.warning("Informe o nome do produto.")
                     else:
                         try:
-                            novo_id_produto = proximo_produto_id()
+                            novo_id_produto = proximo_codigo_produto
                             inserir_registro("produtos", {"produto_id": novo_id_produto, "nome_produto": nome_produto_novo.strip(), "categoria": categoria_nova.strip() or "Geral", "preco_unitario": float(preco_produto_novo)})
                             st.success(f"Produto {novo_id_produto} cadastrado.")
                             st.rerun()
@@ -1225,7 +1245,7 @@ with aba_produtos:
                     if excluir_produto_btn:
                         if confirmar_produto:
                             # Impede apagar produtos ainda usados no histórico de pedidos.
-                            ids_usados = {str(r["produto_id"]) for r in listar_registros("pedidos")}
+                            ids_usados = {str(r["produto_id"]) for r in pedidos.to_dict(orient="records")}
                             if produto_excluir in ids_usados:
                                 st.warning("Este produto aparece em pedidos existentes e não pode ser excluído. Você pode editar nome, categoria ou preço.")
                             else:
@@ -1238,7 +1258,7 @@ with aba_produtos:
                 st.info("Nenhum produto cadastrado para excluir.")
         st.divider()
         st.subheader("Catálogo de produtos")
-        dados_produtos = listar_registros("produtos")
+        dados_produtos = produtos.to_dict(orient="records")
         exibir_tabela(pd.DataFrame(dados_produtos), ["preco_unitario"])
         st.caption(f"Total de produtos: {len(dados_produtos)}")
     except Exception as erro:
