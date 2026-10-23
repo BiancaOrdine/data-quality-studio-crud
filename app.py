@@ -159,8 +159,12 @@ st.markdown(
     [data-testid="stHorizontalBlock"] { min-width: 0; gap: 1rem; }
     [data-testid="stAlert"] { border-radius: 10px !important; }
     .stButton button, [data-testid="stFormSubmitButton"] button { border-radius: 9px; border-color: var(--dq-purple); }
-    .stTabs [data-baseweb="tab-highlight"] {background-color: #774EBF !important;}
-    .stTabs [data-baseweb="tab-border"] {background-color: #774EBF !important;}
+    .stTabs [data-baseweb="tab-highlight"],
+    .stTabs div[role="tablist"] [data-baseweb="tab-highlight"] { background-color: #774EBF !important; height: 3px !important;}
+    .stTabs [data-baseweb="tab-border"],
+    .stTabs div[role="tablist"] {border-color: #774EBF !important;}
+    .stTabs button[aria-selected="true"] {color: #774EBF !important; border-bottom-color: #774EBF !important;}
+    .stTabs button[aria-selected="true"]::after {background-color: #774EBF !important; border-color: #774EBF !important;}
     .stButton button[kind="primary"], [data-testid="stFormSubmitButton"] button[kind="primary"] { background: var(--dq-purple); color: #FFFFFF; }
     .stButton button:hover, [data-testid="stFormSubmitButton"] button:hover { border-color: var(--dq-purple); color: var(--dq-purple); }
 
