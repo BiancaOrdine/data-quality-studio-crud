@@ -259,7 +259,7 @@ for coluna in ["id_compra", "cliente_id"]:
 if "valor_total" in compras.columns:
     compras["valor_total"] = pd.to_numeric(compras["valor_total"], errors="coerce")
 if "data_compra" in compras.columns:
-    compras["data_compra"] = pd.to_datetime(compras["data_compra"], errors="coerce")
+    pd.to_datetime(compras["data_compra"]).dt.strftime("%d/%m/%Y")
 
 for coluna in ["id_pedido", "id_compra", "quantidade"]:
     if coluna in pedidos.columns:
