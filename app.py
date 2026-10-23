@@ -259,7 +259,7 @@ for coluna in ["id_compra", "cliente_id"]:
 if "valor_total" in compras.columns:
     compras["valor_total"] = pd.to_numeric(compras["valor_total"], errors="coerce")
 if "data_compra" in compras.columns:
-    pd.to_datetime(compras["data_compra"]).dt.strftime("%d/%m/%Y")
+    compras["data_compra"] = pd.to_datetime(compras["data_compra"], errors="coerce")
 
 for coluna in ["id_pedido", "id_compra", "quantidade"]:
     if coluna in pedidos.columns:
@@ -343,12 +343,29 @@ def formatar_moeda(valor):
 
 
 def exibir_tabela(df, colunas_monetarias=()):
-    """Exibe valores monetários no padrão brasileiro, sem alterar os dados gravados."""
+    """Exibe datas sem horário e valores monetários no padrão brasileiro."""
     if df is None or df.empty:
         st.info("Nenhum registro cadastrado.")
         return
-    formatters = {c: (lambda v: formatar_moeda(float(v)) if pd.notna(v) else "—") for c in colunas_monetarias if c in df.columns}
-    st.dataframe(df.style.format(formatters, na_rep="—"), use_container_width=True, hide_index=True)
+
+    formatters = {
+        c: (lambda v: formatar_moeda(float(v)) if pd.notna(v) else "—")
+        for c in colunas_monetarias if c in df.columns
+    }
+
+    # Mantém a coluna como data para cálculos e gráficos; altera apenas a exibição.
+    if "data_compra" in df.columns:
+        formatters["data_compra"] = lambda v: (
+            pd.to_datetime(v, errors="coerce").strftime("%d/%m/%Y")
+            if pd.notna(v) and pd.notna(pd.to_datetime(v, errors="coerce"))
+            else "—"
+        )
+
+    st.dataframe(
+        df.style.format(formatters, na_rep="—"),
+        use_container_width=True,
+        hide_index=True,
+    )
 
 
 # Navegação e capa
