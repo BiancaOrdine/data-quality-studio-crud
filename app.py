@@ -44,15 +44,18 @@ st.markdown(
     """
     <style>
     :root {
-        color-scheme: light;
-        --dq-purple: #774EBF;
-        --dq-lilac: #E1C3FF;
-        --dq-cream: #FCF7EE;
+        color-scheme: dark;
+        --dq-purple: #A982F0;
+        --dq-purple-strong: #774EBF;
+        --dq-lilac: #4C356C;
+        --dq-cream: #17131F;
+        --dq-surface: #211B2B;
+        --dq-surface-raised: #2A2237;
         --dq-yellow: #F9CC74;
-        --dq-white: #FFFFFF;
-        --dq-text: #302743;
-        --dq-muted: #665A77;
-        --dq-line: #E1D7EB;
+        --dq-white: #F8F4FC;
+        --dq-text: #F8F4FC;
+        --dq-muted: #D0C4DF;
+        --dq-line: #49395D;
     }
 
     html, body, [data-testid="stAppViewContainer"],
@@ -96,7 +99,7 @@ st.markdown(
         box-sizing: border-box;
         padding: 0.8rem 1rem;
         margin: 0;
-        background: rgba(252, 247, 238, 0.98);
+        background: rgba(33, 27, 43, 0.98);
         border: 1px solid var(--dq-line);
         border-radius: 16px;
         box-shadow: 0 6px 22px rgba(67, 42, 105, 0.10);
@@ -137,11 +140,11 @@ st.markdown(
     .dq-eyebrow { font-size: 0.7rem; font-weight: 750; letter-spacing: 0.15em; color: var(--dq-purple); margin-bottom: 0.65rem; }
     .dq-intro { font-size: 0.98rem; line-height: 1.7; color: var(--dq-muted) !important; max-width: 650px; margin-top: 0.8rem; }
     .dq-rule { border: none; border-top: 1px solid var(--dq-line); margin: 1.65rem 0; }
-    .dq-kpi { height: 100%; min-height: 112px; padding: 1.1rem 1.15rem; border: 1px solid var(--dq-line); border-radius: 14px; background: var(--dq-white); }
+    .dq-kpi { height: 100%; min-height: 112px; padding: 1.1rem 1.15rem; border: 1px solid var(--dq-line); border-radius: 14px; background: var(--dq-surface); }
     .dq-kpi-label { font-size: 0.8rem; color: var(--dq-muted) !important; margin-bottom: 0.65rem; }
     .dq-kpi-value { font-size: clamp(1.3rem, 2vw, 1.9rem); font-weight: 750; letter-spacing: -0.045em; color: var(--dq-text) !important; overflow-wrap: anywhere; line-height: 1.2; }
     .dq-kpi-accent { width: 27px; height: 4px; background: var(--dq-yellow); border-radius: 5px; margin-top: 0.9rem; }
-    .dq-status { padding: 0.85rem 1rem; border: 1px solid #E1C3FF; border-radius: 10px; background: #F3E8FF; color: #52338C; font-size: 0.88rem; line-height: 1.6; margin: 0.5rem 0 1rem; }
+    .dq-status { padding: 0.85rem 1rem; border: 1px solid #E1C3FF; border-radius: 10px; background: #352647; color: #F0E5FF; font-size: 0.88rem; line-height: 1.6; margin: 0.5rem 0 1rem; }
     .dq-footer { text-align: center; color: var(--dq-muted) !important; font-size: 0.8rem; line-height: 1.6; padding: 0.5rem 0 1rem; }
     .dq-footer strong { color: var(--dq-purple) !important; }
 
@@ -149,15 +152,32 @@ st.markdown(
     [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] p,
     [data-testid="stSelectbox"] label, [data-testid="stNumberInput"] label { color: var(--dq-muted) !important; font-size: 0.82rem; }
     [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
-    [data-testid="stNumberInput"] input { background: #FFFFFF !important; border-color: var(--dq-line) !important; color: var(--dq-text) !important; border-radius: 9px !important; }
-    [data-testid="stSelectbox"] div[data-baseweb="select"] *, [data-testid="stNumberInput"] input { color: var(--dq-text) !important; -webkit-text-fill-color: var(--dq-text) !important; }
-    [data-baseweb="popover"], [data-baseweb="menu"], [role="listbox"], [role="option"] { background: #FFFFFF !important; color: var(--dq-text) !important; }
-    [role="option"]:hover { background: #F3E8FF !important; }
-    [data-testid="stDataFrame"] { background: #FFFFFF !important; border: 1px solid var(--dq-line) !important; border-radius: 10px !important; overflow: hidden; }
-    [data-testid="stDataFrame"] iframe { background: #FFFFFF !important; }
+    [data-testid="stNumberInput"] input,
+    [data-testid="stTextInput"] input,
+    [data-testid="stDateInput"] input,
+    [data-testid="stTextArea"] textarea {
+        background: #332940 !important;
+        border: 1px solid #68518A !important;
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+        border-radius: 9px !important;
+    }
+    [data-testid="stSelectbox"] div[data-baseweb="select"] *,
+    [data-testid="stNumberInput"] input { color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; }
+    [data-baseweb="popover"], [data-baseweb="menu"], [role="listbox"], [role="option"] { background: #2A2237 !important; color: #FFFFFF !important; }
+    [role="option"]:hover, [aria-selected="true"] { background: #4C356C !important; color: #FFFFFF !important; }
+    [data-testid="stDataFrame"] { background: #211B2B !important; border: 1px solid var(--dq-line) !important; border-radius: 10px !important; overflow: hidden; }
+    [data-testid="stDataFrame"] iframe { background: #211B2B !important; }
     [data-testid="stPlotlyChart"] { width: 100% !important; min-width: 0 !important; background: transparent !important; }
     [data-testid="stHorizontalBlock"] { min-width: 0; gap: 1rem; }
     [data-testid="stAlert"] { border-radius: 10px !important; }
+    /* Tabs de Compras, Pedidos e Produtos: identidade roxa */
+    [data-testid="stTabs"] [data-baseweb="tab-list"] { gap: 0.35rem; border-bottom: 1px solid #49395D; }
+    [data-testid="stTabs"] button[data-baseweb="tab"] { color: #D0C4DF !important; border-bottom: 3px solid transparent !important; background: transparent !important; }
+    [data-testid="stTabs"] button[data-baseweb="tab"]:hover { color: #E1C3FF !important; background: #2A2237 !important; }
+    [data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] { color: #C5A6FF !important; border-bottom: 3px solid #A982F0 !important; }
+    [data-testid="stTabs"] button[data-baseweb="tab"] p { color: inherit !important; }
+
     .stButton button, [data-testid="stFormSubmitButton"] button { border-radius: 9px; border-color: var(--dq-purple); }
     .stButton button[kind="primary"], [data-testid="stFormSubmitButton"] button[kind="primary"] { background: var(--dq-purple); color: #FFFFFF; }
     .stButton button:hover, [data-testid="stFormSubmitButton"] button:hover { border-color: var(--dq-purple); color: var(--dq-purple); }
@@ -635,7 +655,7 @@ else:
         y="produto_id",
         orientation="h",
         text="quantidade",
-        color_discrete_sequence=[AMEIXA],
+        color_discrete_sequence=["#774EBF"],
         labels={
             "produto_id": "Produto",
             "quantidade": "Unidades"
